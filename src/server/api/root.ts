@@ -1,5 +1,10 @@
-import { postRouter } from "~/server/api/routers/post";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
+import { depotRouter } from "./routers/depot-router";
+import { driverRouter } from "./routers/driver-router";
+import { driverRouter2 } from "./routers/driver-router2";
+import { jobRouter } from "./routers/job-router";
+import { routePlanRouter } from "./routers/route-plan";
+import { solidarityPathwaysMessagingRouter } from "./routers/routing";
 
 /**
  * This is the primary router for your server.
@@ -7,7 +12,12 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
-  post: postRouter,
+  roads: driverRouter2,
+  drivers: driverRouter,
+  depots: depotRouter,
+  jobs: jobRouter,
+  routePlan: routePlanRouter,
+  routeMessaging: solidarityPathwaysMessagingRouter,
 });
 
 // export type definition of API
