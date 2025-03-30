@@ -1,5 +1,6 @@
 import type { GetServerSidePropsContext } from "next";
 import { db } from "~/server/db";
+
 import {
   authenticateUser,
   redirectIfNoSession,
@@ -29,7 +30,7 @@ export const authenticateRoutingServerSide = async (
   if (!depot)
     return {
       redirect: {
-        destination: "/tools/solidarity-pathways",
+        destination: "/",
         permanent: false,
       },
     };

@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
-
-import { Button } from "~/components/ui/button";
-
+import { clientJobUploadOptions } from "~/data/stop-data";
 import { ChevronDownIcon, FilePlus2 } from "lucide-react";
+
+import type { ClientJobBundle } from "~/lib/validators/client-job";
+import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
+import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,11 +13,8 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Separator } from "~/components/ui/separator";
-import { clientJobUploadOptions } from "../../data/stop-data";
-import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
-import type { ClientJobBundle } from "../../types.wip";
-import { FileUploadModal } from "../shared/file-upload-modal.wip";
 
+import { FileUploadModal } from "../shared/file-upload-modal.wip";
 import { JobClientSheetBtn } from "../sheet-job/job-client-sheet-btn";
 
 const StopOptionBtn = () => {
@@ -28,7 +27,7 @@ const StopOptionBtn = () => {
         jobs: jobs.data,
         setJobs: jobs.createMany,
       }),
-    [jobs]
+    [jobs],
   );
 
   const closeSheetFirst = () => {
@@ -36,7 +35,7 @@ const StopOptionBtn = () => {
   };
 
   return (
-    <div className="z-30 flex w-auto  items-center justify-between rounded-md border bg-white text-secondary-foreground">
+    <div className="z-30 flex w-auto items-center justify-between rounded-md border bg-white text-secondary-foreground">
       <JobClientSheetBtn />
 
       <Separator orientation="vertical" className="h-[20px]" />
@@ -49,7 +48,7 @@ const StopOptionBtn = () => {
             <Button
               size={"icon"}
               variant={"outline"}
-              className="rounded-l-none border-0 "
+              className="rounded-l-none border-0"
             >
               <ChevronDownIcon className="h-4 w-4" />
             </Button>
@@ -57,7 +56,7 @@ const StopOptionBtn = () => {
           <DropdownMenuContent className="w-56">
             <DropdownMenuGroup>
               <DropdownMenuItem>
-                <FilePlus2 className="mr-2 h-4 w-4 " />
+                <FilePlus2 className="mr-2 h-4 w-4" />
                 Import from CSV
               </DropdownMenuItem>
             </DropdownMenuGroup>

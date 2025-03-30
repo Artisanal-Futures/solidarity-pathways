@@ -1,19 +1,17 @@
-import { Cross2Icon } from "@radix-ui/react-icons";
-import type { Table } from "@tanstack/react-table";
-
-import { DataTableFacetedFilter } from "~/components/other/data-table-faceted-filter";
-import { DataTableViewOptions } from "~/components/other/data-table-view-options";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-
 import { types } from "~/data/job-filter-data";
 
-interface DataTableToolbarProps<TData> {
+import type { Table } from "@tanstack/react-table";
+import { Cross2Icon } from "@radix-ui/react-icons";
+
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { DataTableFacetedFilter } from "~/components/other/data-table-faceted-filter";
+import { DataTableViewOptions } from "~/components/other/data-table-view-options";
+
+type Props<TData> = {
   table: Table<TData>;
-}
-export function JobDepotDataTableToolbar<TData>({
-  table,
-}: DataTableToolbarProps<TData>) {
+};
+export const JobDepotDataTableToolbar = <TData,>({ table }: Props<TData>) => {
   const isFiltered = table.getState().columnFilters.length > 0;
 
   return (
@@ -53,4 +51,4 @@ export function JobDepotDataTableToolbar<TData>({
       </div>
     </div>
   );
-}
+};

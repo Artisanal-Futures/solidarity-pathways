@@ -1,54 +1,32 @@
-import { useMemo, type FC } from "react";
+import type { UseFormReturn } from "react-hook-form";
+import { useMemo } from "react";
+import { UserPlus } from "lucide-react";
+import { Controller } from "react-hook-form";
 
-import { Controller, type UseFormReturn } from "react-hook-form";
+import { toastService } from "@dreamwalker-studios/toasts";
 
+import type { StopFormValues } from "~/lib/validators/stop";
+import { cn } from "~/lib/utils";
+import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
 import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
-import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "~/components/ui/form";
-import { Input } from "~/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
+import { Button } from "~/components/ui/button";
+import { FormItem, FormLabel, FormMessage } from "~/components/ui/form";
+import { ScrollArea } from "~/components/ui/scroll-area";
 import { Separator } from "~/components/ui/separator";
 
-import type { StopFormValues } from "../../types.wip";
-
-import { UserPlus } from "lucide-react";
-
-import { Button } from "~/components/ui/button";
-import { ScrollArea } from "~/components/ui/scroll-area";
-import { Textarea } from "~/components/ui/textarea";
-
-import { toastService } from "@dreamwalker-studios/toasts";
-import { cn } from "~/lib/utils";
-import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
+import { InputFormField, SelectFormField, TextareaFormField } from "../inputs";
 import { AutoCompleteDepotBtn } from "../shared/autocomplete-depot-btn";
 
-type ClientDetailsSectionProps = {
+type Props = {
   form: UseFormReturn<StopFormValues>;
-  // databaseDrivers?: Array<Driver>;
   editClient?: boolean;
 };
 
-const ClientDetailsSection: FC<ClientDetailsSectionProps> = ({
-  form,
-  editClient,
-}) => {
+export const ClientDetailsSection = ({ form, editClient }: Props) => {
   const formErrors = form.formState.errors;
   const checkIfFormHasErrors = useMemo(() => {
     const keys = ["clientAddress.formatted", "name", "email", "phone", "notes"];
@@ -84,62 +62,38 @@ const ClientDetailsSection: FC<ClientDetailsSectionProps> = ({
             </p>
           )}
 
-          <FormField
-            control={form.control}
+          <SelectFormField
+            form={form}
+            disabled={jobBundles?.clients?.length === 0}
             name="clientId"
-            render={({ field }) => (
-              <FormItem className="w-full">
-                <FormLabel className="text-sm font-normal text-muted-foreground">
-                  Client
-                </FormLabel>
-                <FormControl>
-                  <Select
-                    disabled={jobBundles?.clients?.length === 0}
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      const bundle = jobBundles.getClientById(value);
+            label="Client"
+            description="Select a client to assign to this job"
+            labelClassName="text-sm font-normal text-muted-foreground"
+            values={jobBundles?.clients?.map((client) => ({
+              label: `${client.name}: ${client?.address?.formatted}`,
+              value: client.id,
+            }))}
+            onValueChange={(value) => {
+              const bundle = jobBundles.getClientById(value);
 
-                      if (bundle?.client) {
-                        form.setValue("name", bundle?.client?.name);
-                        form.setValue("phone", bundle?.client?.phone);
-                        form.setValue("email", bundle?.client?.email);
-                        form.setValue(
-                          "clientAddress.formatted",
-                          bundle?.client?.address?.formatted,
-                        );
-                        form.setValue(
-                          "clientAddress.latitude",
-                          bundle?.client?.address?.latitude,
-                        );
-                        form.setValue(
-                          "clientAddress.longitude",
-                          bundle?.client?.address?.longitude,
-                        );
-                      }
-                    }}
-                    defaultValue={field.value}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select a client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectLabel>Select a client</SelectLabel>
-                        {jobBundles?.clients?.map((client) => (
-                          <SelectItem value={client.id} key={client.id}>
-                            <span>{client.name}</span>:{" "}
-                            <span className="text-xs text-muted-foreground">
-                              {client?.address?.formatted}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+              if (bundle?.client) {
+                form.setValue("name", bundle?.client?.name);
+                form.setValue("phone", bundle?.client?.phone);
+                form.setValue("email", bundle?.client?.email);
+                form.setValue(
+                  "clientAddress.formatted",
+                  bundle?.client?.address?.formatted,
+                );
+                form.setValue(
+                  "clientAddress.latitude",
+                  bundle?.client?.address?.latitude,
+                );
+                form.setValue(
+                  "clientAddress.longitude",
+                  bundle?.client?.address?.longitude,
+                );
+              }
+            }}
           />
 
           <>
@@ -151,20 +105,13 @@ const ClientDetailsSection: FC<ClientDetailsSectionProps> = ({
                   <p className="text-lg font-semibold leading-7 [&:not(:first-child)]:mt-6">
                     Edit {form.watch("name") ?? "client"}&apos;s details:
                   </p>
-                  <FormField
-                    control={form.control}
+
+                  <InputFormField
+                    form={form}
                     name="name"
-                    render={({ field }) => (
-                      <FormItem className="w-full">
-                        <FormLabel className="text-sm font-normal text-muted-foreground">
-                          Full Name
-                        </FormLabel>
-                        <FormControl>
-                          <Input placeholder="Your driver's name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    label="Full Name"
+                    placeholder="Your driver's name"
+                    labelClassName="text-sm font-normal text-muted-foreground"
                   />
 
                   <Controller
@@ -191,43 +138,22 @@ const ClientDetailsSection: FC<ClientDetailsSectionProps> = ({
                       </FormItem>
                     )}
                   />
-
-                  <FormField
-                    control={form.control}
+                  <InputFormField
+                    form={form}
                     name="email"
-                    render={({ field }) => (
-                      <FormItem className="w-full">
-                        <FormLabel className="text-sm font-normal text-muted-foreground">
-                          Email
-                        </FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. test@test.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    label="Email"
+                    type="email"
+                    placeholder="e.g. test@test.com"
+                    labelClassName="text-sm font-normal text-muted-foreground"
                   />
 
-                  <FormField
-                    control={form.control}
+                  {/* className="resize-none" */}
+                  <TextareaFormField
+                    form={form}
                     name="notes"
-                    render={({ field }) => (
-                      <FormItem className="w-full">
-                        <FormLabel className="text-sm font-normal text-muted-foreground">
-                          Notes (Optional)
-                        </FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="e.g. Two boxes of squash"
-                            className="resize-none"
-                            onChange={field.onChange}
-                            value={field.value}
-                            aria-rowcount={3}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    label="Notes (optional)"
+                    placeholder="e.g. Two boxes of squash"
+                    labelClassName="text-sm font-normal text-muted-foreground"
                   />
                 </div>
               )}
@@ -249,5 +175,3 @@ const ClientDetailsSection: FC<ClientDetailsSectionProps> = ({
     </AccordionItem>
   );
 };
-
-export default ClientDetailsSection;

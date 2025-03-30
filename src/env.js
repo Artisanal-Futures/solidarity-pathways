@@ -39,6 +39,10 @@ export const env = createEnv({
     // Pusher
     PUSHER_APP_ID: z.string(),
     PUSHER_APP_SECRET: z.string(),
+
+    // Google Maps
+    GOOGLE_API_KEY: z.string(),
+    GOOGLE_GEOCODING_ENDPOINT: z.string(),
   },
 
   /**
@@ -78,6 +82,10 @@ export const env = createEnv({
 
     NEXT_PUBLIC_HOSTNAME: process.env.NEXT_PUBLIC_HOSTNAME,
     NEXT_PUBLIC_GOOGLE_MAP_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAP_API_KEY,
+
+    // Google Maps
+    GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+    GOOGLE_GEOCODING_ENDPOINT: process.env.GOOGLE_GEOCODING_ENDPOINT,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

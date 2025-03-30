@@ -1,7 +1,8 @@
-import { z } from "zod";
 import { addressSchema } from "~/schemas.wip";
-
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { z } from "zod";
+
+import { depotFormSchema } from "~/lib/validators/depot";
 
 export const depotRouter = createTRPCRouter({
   getDepot: protectedProcedure
@@ -14,106 +15,88 @@ export const depotRouter = createTRPCRouter({
       return depot;
     }),
 
-  createDepot: protectedProcedure
-    .input(
-      z.object({
-        name: z.string().optional(),
-        address: addressSchema.optional(),
-        magicCode: z.string(),
-      }),
-    )
+  create: protectedProcedure
+    .input(depotFormSchema)
     .mutation(async ({ ctx, input }) => {
+      let address;
+
+      if (
+        input.address.formatted &&
+        input.address.latitude &&
+        input.address.longitude
+      ) {
+        address = await ctx.db.address.create({
+          data: {
+            formatted: input.address.formatted,
+            latitude: input.address.latitude,
+            longitude: input.address.longitude,
+          },
+        });
+      }
+
       const depot = await ctx.db.depot.create({
         data: {
           ownerId: ctx.session.user.id,
           name: input.name,
           magicCode: input.magicCode,
+          address: address ? { connect: { id: address.id } } : undefined,
         },
       });
 
-      if (!input.address) return depot;
-
-      const address = await ctx.db.address.create({
-        data: {
-          formatted: input.address.formatted,
-          latitude: input.address.latitude,
-          longitude: input.address.longitude,
-        },
-      });
-
-      return ctx.db.depot.update({
-        where: {
-          id: depot.id,
-        },
-        data: {
-          address: {
-            connect: {
-              id: address.id,
-            },
-          },
-        },
-      });
+      return {
+        data: depot,
+        message: "Depot created successfully",
+      };
     }),
 
-  updateDepot: protectedProcedure
-    .input(
-      z.object({
-        depotId: z.string(),
-        name: z.string().optional(),
-        address: addressSchema.optional(),
-        magicCode: z.string().optional(),
-      }),
-    )
+  update: protectedProcedure
+    .input(depotFormSchema.extend({ depotId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const depot = await ctx.db.depot.update({
-        where: {
-          id: input.depotId,
-        },
+        where: { id: input.depotId },
         data: {
           name: input.name,
           magicCode: input.magicCode,
         },
       });
 
-      if (!input.address) return depot;
-
-      const address = await ctx.db.address.upsert({
-        where: {
-          depotId: depot?.id,
-        },
-        update: {
-          formatted: input.address.formatted,
-          latitude: input.address.latitude,
-          longitude: input.address.longitude,
-        },
-        create: {
-          formatted: input.address.formatted,
-          latitude: input.address.latitude,
-          longitude: input.address.longitude,
-        },
-      });
-
-      return ctx.db.depot.update({
-        where: {
-          id: input.depotId,
-        },
-        data: {
-          address: {
-            connect: {
-              id: address.id,
-            },
+      if (
+        input.address.formatted &&
+        input.address.latitude &&
+        input.address.longitude
+      ) {
+        await ctx.db.address.upsert({
+          where: { depotId: depot?.id },
+          update: {
+            formatted: input.address.formatted,
+            latitude: input.address.latitude,
+            longitude: input.address.longitude,
           },
-        },
-      });
+          create: {
+            depotId: depot?.id,
+            formatted: input.address.formatted,
+            latitude: input.address.latitude,
+            longitude: input.address.longitude,
+          },
+        });
+      }
+
+      return {
+        data: depot,
+        message: "Depot updated successfully",
+      };
     }),
 
-  deleteDepot: protectedProcedure
-    .input(z.object({ depotId: z.string() }))
-    .mutation(async ({ input, ctx }) => {
-      return ctx.db.depot.delete({
-        where: {
-          id: input.depotId,
-        },
+  delete: protectedProcedure
+    .input(z.string())
+    .mutation(async ({ input: depotId, ctx }) => {
+      const depot = await ctx.db.depot.delete({
+        where: { id: depotId },
       });
+
+      return {
+        data: depot,
+        message: "Depot deleted successfully",
+      };
     }),
 });

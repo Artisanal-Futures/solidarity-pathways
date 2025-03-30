@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/prefer-promise-reject-errors */
-import axios from "axios";
 import { useState } from "react";
-import { env } from "~/env";
-import type { PromiseMessage } from "~/services/notification/types";
-
 import { notificationService } from "~/services/notification";
+import axios from "axios";
+
+import type { PromiseMessage } from "~/services/notification/types";
+import { env } from "~/env";
+
 import { generateDriverPassCode } from "../utils/server/auth-driver-passcode";
 import { useDepot } from "./depot/use-depot";
 import { useSolidarityState } from "./optimized-data/use-solidarity-state";
@@ -31,7 +32,7 @@ export const useMassMessage = () => {
 
       return {
         email: route?.vehicle?.driver?.email,
-        url: `${env.NEXT_PUBLIC_HOSTNAME}/tools/solidarity-pathways/${depotId}/route/${routeId}/path/${route.id}?driverId=${route.vehicleId}&pc=${passcode}`,
+        url: `${env.NEXT_PUBLIC_HOSTNAME}/${depotId}/route/${routeId}/path/${route.id}?driverId=${route.vehicleId}&pc=${passcode}`,
         passcode: currentDepot?.magicCode ?? "",
       };
     });

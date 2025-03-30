@@ -1,5 +1,6 @@
+import type { PatternFormatProps } from "react-number-format";
 import * as React from "react";
-import { PatternFormat, type PatternFormatProps } from "react-number-format";
+import { PatternFormat } from "react-number-format";
 
 import { cn } from "~/lib/utils";
 

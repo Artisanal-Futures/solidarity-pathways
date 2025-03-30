@@ -252,3 +252,19 @@ export type MapPoint = {
   address: string;
   color: string;
 };
+
+export type Customer = {
+  name: string;
+  address: string;
+  email: string;
+  phone: string;
+  prep_time: number;
+  service_time: number;
+  priority: number;
+  time_start: string;
+  time_end: string;
+  lat: number;
+  lon: number;
+  order: string;
+  notes: string;
+};

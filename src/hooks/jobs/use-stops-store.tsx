@@ -1,8 +1,11 @@
+"use client";
+
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { clientJobDataForNewLatLng } from "../../data/stop-data";
 import type { ClientJobBundle } from "../../types.wip";
+
+import { clientJobDataForNewLatLng } from "../../data/stop-data";
 
 interface IUseStopsStore {
   locations: ClientJobBundle[];
@@ -29,7 +32,7 @@ interface IUseStopsStore {
 
   // Lasso related selections
   selectedJobIds: string[];
-  setSelectedJobIds: (ids: string[]) => void;  
+  setSelectedJobIds: (ids: string[]) => void;
 }
 
 export const useStopsStore = create<IUseStopsStore>()(
@@ -56,7 +59,7 @@ export const useStopsStore = create<IUseStopsStore>()(
       updateLocation: (id, data) =>
         set((state) => ({
           locations: state.locations.map((location) =>
-            location.job.id === id ? { ...location, ...data } : location
+            location.job.id === id ? { ...location, ...data } : location,
           ),
         })),
 
@@ -86,6 +89,6 @@ export const useStopsStore = create<IUseStopsStore>()(
       storage: createJSONStorage(() => sessionStorage), // (optional) by default the 'localStorage' is used
       partialize: (state) => ({ locations: state.locations }),
       skipHydration: true,
-    }
-  )
+    },
+  ),
 );

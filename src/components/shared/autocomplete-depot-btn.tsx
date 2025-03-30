@@ -1,15 +1,22 @@
+"use client";
+
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import { useState } from "react";
-import GooglePlacesAutocomplete, {
-  geocodeByAddress,
-  getLatLng,
-} from "react-google-places-autocomplete";
 import type {
   FieldValues,
   Path,
   PathValue,
   UseFormReturn,
 } from "react-hook-form";
+import { useState } from "react";
+import GooglePlacesAutocomplete, {
+  geocodeByAddress,
+  getLatLng,
+} from "react-google-places-autocomplete";
+
+import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
+import { useJsApiLoader } from "@react-google-maps/api";
+
+import { env } from "~/env";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -21,11 +28,7 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 
-import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
-import { useJsApiLoader } from "@react-google-maps/api";
-import { env } from "~/env";
-
-interface IProps<T extends FieldValues> {
+interface Props<T extends FieldValues> {
   form: UseFormReturn<T>;
   formKey: string;
   onChange: (value: string) => void;
@@ -44,7 +47,7 @@ export function AutoCompleteDepotBtn<T extends FieldValues>({
   form,
   useDefault,
   formKey,
-}: IProps<T>) {
+}: Props<T>) {
   const [open, setOpen] = useState(false);
 
   const { isLoaded } = useJsApiLoader({

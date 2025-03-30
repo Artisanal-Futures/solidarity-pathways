@@ -1,12 +1,13 @@
-import CurrentStopForm from "~/components/tracking/current-stop-form";
-
-import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
-import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
-import { useOptimizedRoutePlan } from "../../hooks/optimized-data/use-optimized-route-plan";
-
 import * as React from "react";
 
+import { DialogClose } from "@radix-ui/react-dialog";
+
+import { api } from "~/trpc/react";
+import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
+import { useOptimizedRoutePlan } from "~/hooks/optimized-data/use-optimized-route-plan";
+import { useMediaQuery } from "~/hooks/use-media-query";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -24,12 +25,9 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "~/components/ui/drawer";
+import { CurrentStopForm } from "~/components/tracking/current-stop-form";
 
-import { DialogClose } from "@radix-ui/react-dialog";
-import { useMediaQuery } from "~/hooks/use-media-query";
-import { api } from "~/trpc/react";
-
-export default function FieldJobSheet() {
+export const FieldJobSheet = () => {
   const jobBundles = useClientJobBundles();
   const optimizedRoutePlan = useOptimizedRoutePlan();
 
@@ -110,4 +108,4 @@ export default function FieldJobSheet() {
       </DrawerContent>
     </Drawer>
   );
-}
+};

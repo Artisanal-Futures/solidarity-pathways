@@ -1,12 +1,19 @@
-import { useMemo, useState, type FC } from "react";
+import type { UseFormReturn } from "react-hook-form";
+import { useMemo, useState } from "react";
+import { Home, Package, Undo } from "lucide-react";
+import { Controller } from "react-hook-form";
 
-import { Controller, type UseFormReturn } from "react-hook-form";
+import { useAutoAnimate } from "@formkit/auto-animate/react";
+import { JobType } from "@prisma/client";
 
+import type { StopFormValues } from "../../types.wip";
+import { cn } from "~/lib/utils";
 import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
+import { Button } from "~/components/ui/button";
 import {
   FormControl,
   FormDescription,
@@ -16,25 +23,15 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { Input } from "~/components/ui/input";
+import { ScrollArea } from "~/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-
-import type { StopFormValues } from "../../types.wip";
-
-import { useAutoAnimate } from "@formkit/auto-animate/react";
-import { JobType } from "@prisma/client";
-import { Home, Package, Undo } from "lucide-react";
-import { Button } from "~/components/ui/button";
-import { ScrollArea } from "~/components/ui/scroll-area";
 import { Switch } from "~/components/ui/switch";
-import { Textarea } from "~/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
@@ -42,16 +39,16 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 
-import { cn } from "~/lib/utils";
 import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
+import { SelectFormField, TextareaFormField } from "../inputs";
+import { TimeInputFormField } from "../inputs/time-input-form-field";
 import { AutoCompleteDepotBtn } from "../shared/autocomplete-depot-btn";
 
-type StopDetailsSectionProps = {
+type Props = {
   form: UseFormReturn<StopFormValues>;
-  // databaseDrivers?: Array<Driver>;
 };
 
-const StopDetailsSection: FC<StopDetailsSectionProps> = ({ form }) => {
+const StopDetailsSection = ({ form }: Props) => {
   const [useDefault, setUseDefault] = useState(
     form.getValues("address.formatted") === "" ? false : true,
   );
@@ -225,62 +222,27 @@ const StopDetailsSection: FC<StopDetailsSectionProps> = ({ form }) => {
                 />
               )}
             </div>
-            <FormField
-              control={form.control}
+
+            <TimeInputFormField
+              form={form}
               name="prepTime"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-normal text-muted-foreground">
-                    Prep Time (Optional)
-                  </FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        placeholder="e.g. 30"
-                        className="block w-full rounded-md py-1.5 pr-12 text-gray-900 sm:text-sm sm:leading-6"
-                        {...field}
-                        type="number"
-                      />
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                        <span className="text-gray-500 sm:text-sm">min</span>
-                      </div>
-                    </div>
-                  </FormControl>
-                  <FormDescription className="text-xs text-muted-foreground/75">
-                    Any additional time needed before the stop?
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />{" "}
-            <FormField
-              control={form.control}
+              label="Prep Time (optional)"
+              labelClassName="text-sm font-normal text-muted-foreground"
+              description="Any additional time needed before the stop?"
+              descriptionClassName="text-xs text-muted-foreground/75"
+              unit="min"
+            />
+
+            <TimeInputFormField
+              form={form}
               name="serviceTime"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-normal text-muted-foreground">
-                    Service Time
-                  </FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <Input
-                        placeholder="e.g. 30"
-                        className="block w-full rounded-md py-1.5 pr-12 text-gray-900 sm:text-sm sm:leading-6"
-                        {...field}
-                        type="number"
-                      />
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                        <span className="text-gray-500 sm:text-sm">min</span>
-                      </div>
-                    </div>
-                  </FormControl>
-                  <FormDescription className="text-xs text-muted-foreground/75">
-                    How long should the stop take?
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />{" "}
+              label="Service Time"
+              labelClassName="text-sm font-normal text-muted-foreground"
+              description="How long should the stop take?"
+              descriptionClassName="text-xs text-muted-foreground/75"
+              unit="min"
+            />
+
             <FormField
               control={form.control}
               name="priority"
@@ -357,60 +319,27 @@ const StopDetailsSection: FC<StopDetailsSectionProps> = ({ form }) => {
               </div>{" "}
               <FormMessage />
             </FormItem>
-            <FormField
-              control={form.control}
+
+            <SelectFormField
+              form={form}
               name="type"
-              render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormLabel className="text-sm font-normal text-muted-foreground">
-                    {" "}
-                    Stop Type
-                  </FormLabel>
-                  <FormControl>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select a job type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel>Select a type</SelectLabel>
-                          {Object.keys(JobType).map((job) => (
-                            <SelectItem value={job} key={job}>
-                              {job}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              label="Stop Type"
+              placeholder="Select a type"
+              labelClassName="text-sm font-normal text-muted-foreground"
+              values={Object.keys(JobType).map((job) => ({
+                label: job,
+                value: job,
+              }))}
             />
-            <FormField
-              control={form.control}
+
+            {/* className="resize-none" */}
+            <TextareaFormField
+              form={form}
               name="order"
-              render={({ field }) => (
-                <FormItem className="w-full">
-                  <FormLabel className="text-sm font-normal text-muted-foreground">
-                    Order Details (Optional)
-                  </FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="e.g. Two boxes of squash"
-                      className="resize-none"
-                      // {...field}
-                      onChange={field.onChange}
-                      value={field.value}
-                      aria-rowcount={3}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              rows={3}
+              label="Order Details (Optional)"
+              labelClassName="text-sm font-normal text-muted-foreground"
+              placeholder="e.g. Two boxes of squash"
             />
           </div>
         </AccordionContent>

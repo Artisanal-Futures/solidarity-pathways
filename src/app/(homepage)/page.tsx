@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
+
 import { HomepageClient } from "./_components/homepage-client";
 
 export default async function SolidarityPathwaysHomePage() {

@@ -1,9 +1,10 @@
-import type { Prisma } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { z } from "zod";
 
+import type { Prisma } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+
 import { pusherServer } from "~/lib/soketi/server";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const solidarityPathwaysMessagingRouter = createTRPCRouter({
   createNewDepotServer: protectedProcedure
@@ -266,9 +267,7 @@ export const solidarityPathwaysMessagingRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const channel = await ctx.db.channel.findFirst({
-        where: {
-          name: input.channelName,
-        },
+        where: { name: input.channelName },
       });
 
       if (!channel) {
@@ -278,14 +277,15 @@ export const solidarityPathwaysMessagingRouter = createTRPCRouter({
         });
       }
 
-      return ctx.db.channel.update({
-        where: {
-          id: channel.id,
-        },
-        data: {
-          name: input.email,
-        },
+      const updatedChannel = await ctx.db.channel.update({
+        where: { id: channel.id },
+        data: { name: input.email },
       });
+
+      return {
+        data: updatedChannel,
+        message: "Driver channel was successfully updated.",
+      };
     }),
 
   getDepotGeneralChannel: protectedProcedure
@@ -921,12 +921,18 @@ export const solidarityPathwaysMessagingRouter = createTRPCRouter({
   // }),
   nukeEverything: protectedProcedure.mutation(async ({ ctx }) => {
     await ctx.db.profile.deleteMany();
-    return ctx.db.server.deleteMany({
+
+    await ctx.db.server.deleteMany({
       where: {
         inviteCode: {
           startsWith: "depot-",
         },
       },
     });
+
+    return {
+      data: null,
+      message: "Messaging deleted!",
+    };
   }),
 });

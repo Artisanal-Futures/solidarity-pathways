@@ -1,81 +1,38 @@
-import type { GetServerSidePropsContext } from "next";
+import { redirect } from "next/navigation";
+import { auth } from "~/server/auth";
+import { db } from "~/server/db";
 
-import { UserPlus } from "lucide-react";
+import { PathwaysDepotOverviewClient } from "./_components/overview-client";
 
-import { AbsolutePageLoader } from "~/components/absolute-page-loader";
-import { Button } from "~/components/ui/button";
+export default async function PathwaysDepotOverviewPage({
+  params,
+  searchParams,
+}: {
+  params: { depotId: string };
+  searchParams: { date?: string; welcome?: string };
+}) {
+  const session = await auth();
 
-import { HomePageOnboardingCard } from "~/app/_components//overview/homepage-onboarding-card.wip";
-import { HomePageOverviewCard } from "~/app/_components//overview/homepage-overview-card.wip";
-import { RouteCalendar } from "~/app/_components//overview/route-calendar.wip";
+  if (!session?.user) return redirect("/auth/signin?callbackUrl=/");
 
-import { DriverVehicleSheet } from "~/app/_components//sheet-driver";
+  if (session?.user?.role === "DRIVER") return redirect("/unauthorized");
 
-import RouteLayout from "~/app/_components//layout/route-layout";
+  const depot = await db.depot.findUnique({
+    where: { id: params.depotId, ownerId: session.user.id },
+  });
 
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
+  if (!depot) return redirect("/");
 
-import { ImportDriversButton } from "~/app/_components//overview/import-drivers-button";
+  // Ensure date parameter is present
+  if (!searchParams.date) {
+    const formattedDate = new Date().toDateString().replace(/\s/g, "+");
+    const welcomeParam = searchParams.welcome
+      ? `&welcome=${searchParams.welcome}`
+      : "";
+    return redirect(
+      `/${params.depotId}/overview?date=${formattedDate}${welcomeParam}`,
+    );
+  }
 
-import { CreateRouteButton } from "~/app/_components//overview/create-route-button";
-
-import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
-
-import { AddNewDataPopover } from "~/app/_components//layout/add-new-data-popover";
-import { PathwaySettingsButton } from "~/app/_components//overview/pathways-settings-button";
-import { useMediaQuery } from "~/hooks/use-media-query";
-import { authenticateRoutingServerSide } from "~/utils/authenticate-user";
-
-const PathwaysDepotOverviewPage = () => {
-  const { sessionStatus } = useSolidarityState();
-
-  const { onSheetOpenChange } = useDriverVehicleBundles();
-
-  const isDesktop = useMediaQuery("(min-width: 1024px)");
-
-  const addSingleDriver = () => onSheetOpenChange(true);
-
-  if (sessionStatus === "loading") return <AbsolutePageLoader />;
-
-  return (
-    <>
-      <DriverVehicleSheet standalone={true} />
-
-      <RouteLayout>
-        <section className="flex flex-col-reverse justify-end border-2 max-md:h-full max-md:p-2 md:flex-1 md:justify-center lg:flex-row">
-          <div className="relative flex w-full flex-col items-center justify-center space-y-10">
-            {!isDesktop && <RouteCalendar />}
-
-            <HomePageOnboardingCard />
-            <HomePageOverviewCard />
-          </div>
-          <AddNewDataPopover />
-        </section>{" "}
-      </RouteLayout>
-    </>
-  );
-};
-const validateDate = (ctx: GetServerSidePropsContext) => {
-  const { depotId, date, welcome } = ctx.query;
-
-  if (!date)
-    return {
-      redirect: {
-        destination: `/tools/solidarity-pathways/${
-          depotId as string
-        }/overview?date=${new Date().toDateString().replace(/\s/g, "+")}${
-          welcome ? `&welcome=${welcome as string}` : ""
-        }`,
-        permanent: false,
-      },
-    };
-
-  return {
-    props: {},
-  };
-};
-
-export const getServerSideProps = async (ctx: GetServerSidePropsContext) =>
-  authenticateRoutingServerSide(ctx, false, validateDate);
-
-export default PathwaysDepotOverviewPage;
+  return <PathwaysDepotOverviewClient />;
+}

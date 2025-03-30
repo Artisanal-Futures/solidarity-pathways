@@ -1,15 +1,13 @@
 import Link from "next/link";
-import RouteLayout from "~/components/layout/route-layout";
+import { auth } from "~/server/auth";
 
 import { Button } from "~/components/ui/button";
-import { auth } from "~/server/auth";
+import RouteLayout from "~/components/layout/route-layout";
 
 export default async function SandboxRoutingPage() {
   const session = await auth();
 
-  const redirectLink = session?.user
-    ? "/tools/solidarity-pathways"
-    : "/auth/signin";
+  const redirectLink = session?.user ? "/" : "/auth/signin";
 
   return (
     <>

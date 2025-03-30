@@ -1,16 +1,12 @@
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { driverVehicleSchema, optimizationPlanSchema } from "~/types.wip";
+import { z } from "zod";
+
 import { RouteStatus } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
-import { z } from "zod";
+import type { ClientJobBundle, DriverVehicleBundle } from "~/types.wip";
 import { pusherServer } from "~/lib/soketi/server";
-import {
-  driverVehicleSchema,
-  optimizationPlanSchema,
-  type ClientJobBundle,
-  type DriverVehicleBundle,
-} from "~/types.wip";
-
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const routePlanRouter = createTRPCRouter({
   setOptimizedData: protectedProcedure
@@ -50,7 +46,10 @@ export const routePlanRouter = createTRPCRouter({
       //   },
       // });
 
-      return route;
+      return {
+        data: route,
+        message: "Optimized stops have been cleared",
+      };
     }),
 
   setOptimizedDataWithVroom: protectedProcedure
@@ -177,7 +176,10 @@ export const routePlanRouter = createTRPCRouter({
         `Stop at ${optimizedStop?.job?.address?.formatted} was updated to ${input.state}`,
       );
 
-      return optimizedStop;
+      return {
+        data: optimizedStop,
+        message: "Stop status was successfully updated.",
+      };
     }),
 
   updateOptimizedRoutePathStatus: protectedProcedure
@@ -591,7 +593,7 @@ export const routePlanRouter = createTRPCRouter({
           });
         });
 
-      return ctx.db.route.update({
+      const routeVehicles = await ctx.db.route.update({
         where: {
           id: input.routeId,
         },
@@ -601,6 +603,11 @@ export const routePlanRouter = createTRPCRouter({
           },
         },
       });
+
+      return {
+        data: routeVehicles,
+        message: "Route drivers were successfully set.",
+      };
     }),
 
   getVehicleBundles: protectedProcedure
@@ -630,6 +637,70 @@ export const routePlanRouter = createTRPCRouter({
       return bundles as unknown as DriverVehicleBundle[];
     }),
 
+  getVehicleById: protectedProcedure
+    .input(z.object({ routeId: z.string(), vehicleId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const data = await ctx.db.vehicle.findUnique({
+        where: {
+          routeId: input.routeId,
+          id: input.vehicleId,
+        },
+        include: {
+          driver: { include: { address: true } },
+          startAddress: true,
+          endAddress: true,
+          breaks: true,
+        },
+      });
+
+      return {
+        driver: data?.driver ?? null,
+        vehicle: data,
+      } as unknown as DriverVehicleBundle;
+    }),
+
+  getVehicleByIdControlled: protectedProcedure
+    .input(z.object({ routeId: z.string(), vehicleId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const data = await ctx.db.vehicle.findUnique({
+        where: {
+          routeId: input.routeId,
+          id: input.vehicleId,
+        },
+        include: {
+          driver: { include: { address: true } },
+          startAddress: true,
+          endAddress: true,
+          breaks: true,
+        },
+      });
+
+      return {
+        driver: data?.driver ?? null,
+        vehicle: data,
+      } as unknown as DriverVehicleBundle;
+    }),
+
+  getDriverByEmail: protectedProcedure
+    .input(z.object({ email: z.string(), routeId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const data = await ctx.db.vehicle.findFirst({
+        where: {
+          driver: {
+            email: input.email,
+          },
+          routeId: input.routeId,
+        },
+        include: {
+          driver: true,
+        },
+      });
+
+      return {
+        driver: data?.driver ?? null,
+        vehicle: data,
+      } as unknown as DriverVehicleBundle;
+    }),
   getJobBundles: protectedProcedure
     .input(z.object({ routeId: z.string() }))
     .query(async ({ ctx, input }) => {

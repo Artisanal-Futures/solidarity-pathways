@@ -1,13 +1,16 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-
 import { Settings } from "lucide-react";
-import { Button } from "~/components/ui/button";
-import { useSolidarityState } from "../../hooks/optimized-data/use-solidarity-state";
-import NavbarActions from "../navbar-actions";
-import { PathwaysSettingsMenu } from "../settings/pathways-settings-menu.wip";
 
-const Navbar = () => {
+import { Button } from "~/components/ui/button";
+import { NavbarActions } from "~/components/layout/navbar-actions";
+
+import { useSolidarityState } from "../../hooks/optimized-data/use-solidarity-state";
+import { PathwaysSettingsMenu } from "../settings/pathways-settings-menu";
+
+export const Navbar = () => {
   const { pathId } = useSolidarityState();
 
   return (
@@ -56,5 +59,3 @@ const Navbar = () => {
     </>
   );
 };
-
-export default Navbar;

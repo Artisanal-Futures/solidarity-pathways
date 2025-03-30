@@ -1,4 +1,5 @@
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
+import { clientRouter } from "./routers/clients";
 import { depotRouter } from "./routers/depot-router";
 import { driverRouter } from "./routers/driver-router";
 import { driverRouter2 } from "./routers/driver-router2";
@@ -18,6 +19,8 @@ export const appRouter = createTRPCRouter({
   jobs: jobRouter,
   routePlan: routePlanRouter,
   routeMessaging: solidarityPathwaysMessagingRouter,
+
+  clients: clientRouter,
 });
 
 // export type definition of API

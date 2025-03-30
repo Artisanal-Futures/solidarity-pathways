@@ -1,4 +1,5 @@
-import { RouteStatus } from "@prisma/client";
+import { useEffect, useState } from "react";
+import { useMapStore } from "~/stores/use-map-store";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -7,35 +8,19 @@ import {
   ThumbsDownIcon,
   ThumbsUpIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { Button } from "~/components/ui/button";
 
-import * as z from "zod";
+import { toastService } from "@dreamwalker-studios/toasts";
+import { RouteStatus } from "@prisma/client";
 
-import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
-
-import { notificationService } from "~/services/notification";
+import type { OptimizedStop } from "../../types.wip";
+import type { EditStopFormValues } from "~/lib/validators/route-plan";
+import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react"; // ?
 
-import { cn } from "~/lib/utils";
-import { useDriverVehicleBundles } from "../../hooks/drivers/use-driver-vehicle-bundles";
+import { Button } from "~/components/ui/button";
+
+import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
 import { useOptimizedRoutePlan } from "../../hooks/optimized-data/use-optimized-route-plan";
-
-import { useSolidarityMessaging } from "../../hooks/use-solidarity-messaging";
-import type { OptimizedStop } from "../../types.wip";
-
-import { useMediaQuery } from "~/hooks/use-media-query";
-
-import { useMapStore } from "~/stores/use-map-store";
-
-const notificationsFormSchema = z.object({
-  status: z.nativeEnum(RouteStatus, {
-    required_error: "You need to select a notification type.",
-  }),
-  deliveryNotes: z.string().optional(),
-});
-
-export type EditStopFormValues = z.infer<typeof notificationsFormSchema>;
 
 export const MobileDrawer = () => {
   const {
@@ -57,22 +42,16 @@ export const MobileDrawer = () => {
 
   const optimizedRoutePlan = useOptimizedRoutePlan();
 
-  const driverBundles = useDriverVehicleBundles();
-
-  const apiContext = api.useContext();
+  const apiContext = api.useUtils();
 
   const updateStopStatus = api.routePlan.updateOptimizedStopState.useMutation({
-    onSuccess: () => {
-      notificationService.notifySuccess({
-        message: "Stop status was successfully updated.",
-      });
-    },
-    onError: (error: unknown) => {
-      notificationService.notifyError({
-        message: "There was an issue updating the stop status.",
+    onSuccess: ({ message }) => toastService.success(message),
+    onError: (error) =>
+      toastService.error({
+        message:
+          error?.message ?? "There was an issue updating the stop status.",
         error,
-      });
-    },
+      }),
     onSettled: () => {
       jobBundles.onFieldJobSheetOpen(false);
       void apiContext.routePlan.invalidate();
@@ -92,8 +71,6 @@ export const MobileDrawer = () => {
     })
     .filter((job) => job !== undefined);
 
-  const isDesktop = useMediaQuery("(min-width: 1024px)");
-
   const [hasPriorSuccess, setHasPriorSuccess] = useState(false);
 
   useEffect(() => {
@@ -107,9 +84,9 @@ export const MobileDrawer = () => {
     if (!constantTracking) {
       return "GPS";
     }
-    if (locationMessage.message.includes("initial")) {
+    if (locationMessage?.message?.includes("initial")) {
       return "🏁 GPS";
-    } else if (locationMessage.message.includes("timed out")) {
+    } else if (locationMessage?.message?.includes("timed out")) {
       return "GPS 👀 ";
     } else if (locationMessage.message.includes("success")) {
       if (!locationMessage.error && !hasPriorSuccess) {
@@ -123,13 +100,7 @@ export const MobileDrawer = () => {
     }
   };
 
-  // routePlan?.stops?.forEach((stop, index) => {
-  //   console.log(`Stop ${index + 1}:`, stop);
-  // });
-
   const [carouselIndex, setCarouselIndex] = useState(0); // To track the current index of the carousel
-
-  const currentJob = jobBundles.active?.job;
 
   // Assuming `route?.stops` is an array of stops for the route
   const route = optimizedRoutePlan?.data;

@@ -1,3 +1,12 @@
+import { useState } from "react";
+import { Mail, MapPin } from "lucide-react";
+
+import type { ClientJobBundle } from "~/types.wip";
+import { api } from "~/trpc/react";
+import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
+import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
+import { Button } from "~/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import {
   Sheet,
   SheetContent,
@@ -5,25 +14,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "~/components/map-sheet";
+import { JobDepotDataTable } from "~/components/sheet-job/job-depot-data-table";
+import { JobDepotPreviousRouteSelect } from "~/components/sheet-job/job-depot-previous-route-select";
 import StopForm from "~/components/stops-section/stop-form";
 
-import { Mail, MapPin } from "lucide-react";
-
-import { useState } from "react";
-import { Button } from "~/components/ui/button";
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-
-import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
-import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
-import { api } from "~/trpc/react";
-import type { ClientJobBundle } from "~/types.wip";
-
-import {
-  JobDepotDataTable,
-  JobDepotPreviousRouteSelect,
-} from "~/components/sheet-job";
-const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
+export const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
   const { depotId, sessionStatus } = useSolidarityState();
   const jobBundles = useClientJobBundles();
 
@@ -163,5 +158,3 @@ const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
     </Sheet>
   );
 };
-
-export default JobClientSheet;

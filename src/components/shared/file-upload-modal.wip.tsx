@@ -1,4 +1,10 @@
+import type { ChangeEvent, ReactNode } from "react";
+import { useRef, useState } from "react";
+import { useSession } from "next-auth/react";
+
 import { ReloadIcon } from "@radix-ui/react-icons";
+
+import type { UploadOptions } from "~/types/misc";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -8,21 +14,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
-
-import { useSession } from "next-auth/react";
-import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { Switch } from "~/components/ui/switch";
-import type { UploadOptions } from "../../types.wip";
+
+type Props<T> = UploadOptions<T> & {
+  children: ReactNode;
+  handleOnClick?: () => void;
+};
 
 export const FileUploadModal = <T,>({
   handleOnClick,
@@ -31,15 +30,12 @@ export const FileUploadModal = <T,>({
   type,
   currentData,
   children,
-}: UploadOptions<T> & {
-  children: ReactNode;
-  handleOnClick?: () => void;
-}) => {
+}: Props<T>) => {
   const { status } = useSession();
 
   const [open, setOpen] = useState(false);
 
-  const [saveToDB, setSaveToDB] = useState(status === "authenticated");
+  const [saveToDB] = useState(status === "authenticated");
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<T[]>([]);
@@ -133,7 +129,7 @@ export const FileUploadModal = <T,>({
             currentData?.length > 0 &&
             data?.length === 0 &&
             type !== "job" && (
-              <p className="py-2 font-bold ">
+              <p className="py-2 font-bold">
                 You currently have {currentData.length} {type as string}s
                 available. You can always add more.
               </p>
@@ -146,14 +142,14 @@ export const FileUploadModal = <T,>({
           )}
           {data?.length > 0 && tableData?.length > 0 && (
             <>
-              <div className="flex gap-4 px-4 ">
-                <div className="flex w-1/4 flex-col ">
+              <div className="flex gap-4 px-4">
+                <div className="flex w-1/4 flex-col">
                   <p className="text-lg font-semibold">Name</p>
                 </div>
-                <div className="flex w-1/4 flex-col ">
+                <div className="flex w-1/4 flex-col">
                   <p className="text-lg font-semibold">Email</p>
                 </div>
-                <div className="flex w-2/4 flex-col ">
+                <div className="flex w-2/4 flex-col">
                   <p className="text-lg font-semibold">Address</p>
                 </div>
               </div>
@@ -162,13 +158,13 @@ export const FileUploadModal = <T,>({
                 {tableData.map((bundle, idx) => {
                   return (
                     <div className="flex gap-4 p-4 odd:bg-muted" key={idx}>
-                      <p className=" w-1/4 capitalize">{bundle.name}</p>
+                      <p className="w-1/4 capitalize">{bundle.name}</p>
 
-                      <p className="w-1/4 overflow-hidden text-ellipsis ">
+                      <p className="w-1/4 overflow-hidden text-ellipsis">
                         {bundle?.email ?? ""}
                       </p>
 
-                      <p className=" w-2/4 ">{bundle.address}</p>
+                      <p className="w-2/4">{bundle.address}</p>
                     </div>
                   );
                 })}

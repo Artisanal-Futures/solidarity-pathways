@@ -1,8 +1,9 @@
-import { HamburgerMenuIcon } from "@radix-ui/react-icons";
-import { ShieldCheck, Store, User } from "lucide-react";
-import { signIn, signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
+import { ShieldCheck, Store, User } from "lucide-react";
+import { signIn, signOut, useSession } from "next-auth/react";
+
+import { HamburgerMenuIcon } from "@radix-ui/react-icons";
 
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
@@ -15,13 +16,14 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "~/components/ui/sheet";
-import MainNav from "../main-nav";
 
-export const MobileNav = ({
-  links,
-}: {
+import { MainNav } from "./main-nav";
+
+type Props = {
   links: { id: string; name: string }[];
-}) => {
+};
+
+export const MobileNav = ({ links }: Props) => {
   const { data: sessionData } = useSession();
   return (
     <Sheet>

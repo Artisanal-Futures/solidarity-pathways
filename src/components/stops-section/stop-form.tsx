@@ -1,44 +1,37 @@
-import { zodResolver } from "@hookform/resolvers/zod";
-
-import { uniqueId } from "lodash";
-import { Pencil, Trash } from "lucide-react";
-import { useState, type FC } from "react";
-
-import { useForm } from "react-hook-form";
-
-import { Button } from "~/components/ui/button";
-
-import { Form } from "~/components/ui/form";
-
-import type { Coordinates } from "~/types";
-
-import { useSession } from "next-auth/react";
-import { AlertModal } from "~/components/alert-modal";
-import { Accordion } from "~/components/ui/accordion";
-
-import { cn } from "~/lib/utils";
-import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
-import {
-  stopFormSchema,
-  type ClientJobBundle,
-  type StopFormValues,
-} from "../../types.wip";
-import { formatJobFormDataToBundle } from "../../utils/client-job/format-clients.wip";
+import { useState } from "react";
+import { stopFormSchema } from "~/types.wip";
+import { formatJobFormDataToBundle } from "~/utils/client-job/format-clients.wip";
 import {
   secondsToMinutes,
   unixSecondsToMilitaryTime,
-} from "../../utils/generic/format-utils.wip";
+} from "~/utils/generic/format-utils.wip";
+import { uniqueId } from "lodash";
+import { Pencil, Trash } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { useForm } from "react-hook-form";
 
 import { toastService } from "@dreamwalker-studios/toasts";
-import ClientDetailsSection from "./client-detail-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import type { ClientJobBundle } from "~/lib/validators/client-job";
+import type { StopFormValues } from "~/lib/validators/stop";
+import type { Coordinates } from "~/types/geolocation";
+import { cn } from "~/lib/utils";
+import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
+import { Accordion } from "~/components/ui/accordion";
+import { Button } from "~/components/ui/button";
+import { Form } from "~/components/ui/form";
+import { AlertModal } from "~/components/alert-modal";
+
+import { ClientDetailsSection } from "./client-detail-form";
 import StopDetailsSection from "./job-details-form";
 
-type TStopForm = {
+type Props = {
   handleOnOpenChange: (data: boolean) => void;
   activeLocation?: ClientJobBundle | null;
 };
 
-const StopForm: FC<TStopForm> = ({ handleOnOpenChange, activeLocation }) => {
+const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
   const jobs = useClientJobBundles();
   const [open, setOpen] = useState(false);
   const [loading] = useState(false);

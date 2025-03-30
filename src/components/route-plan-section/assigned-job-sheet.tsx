@@ -1,8 +1,18 @@
-import { useMemo, useState, type FC } from "react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { getColor } from "~/utils/generic/color-handling";
+import { cuidToIndex } from "~/utils/generic/format-utils.wip";
+import { generateDriverPassCode } from "~/utils/server/auth-driver-passcode";
 
+import type { OptimizedRoutePath } from "~/types/route";
+import type { OptimizedStop } from "~/types/stop";
+import { cn } from "~/lib/utils";
+import { api } from "~/trpc/react";
+import { useDepot } from "~/hooks/depot/use-depot";
+import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
+import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { Button } from "~/components/ui/button";
 import { Card } from "~/components/ui/card";
-
 import {
   Sheet,
   SheetContent,
@@ -10,34 +20,23 @@ import {
   SheetHeader,
   SheetTrigger,
 } from "~/components/map-sheet";
-
-import { cn } from "~/lib/utils";
-
-import Link from "next/link";
-
 import { AssignedJobHeaderCard } from "~/components/route-plan-section/assigned-job-header-card";
 import RouteBreakdown from "~/components/route-plan-section/route-breakdown";
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
-import type { OptimizedRoutePath, OptimizedStop } from "~/types.wip";
-import { getColor } from "~/utils/generic/color-handling";
-import { cuidToIndex } from "~/utils/generic/format-utils.wip";
-
-import { useDepot } from "../../hooks/depot/use-depot";
-import { useSolidarityState } from "../../hooks/optimized-data/use-solidarity-state";
-import { useSolidarityMessaging } from "../../hooks/use-solidarity-messaging";
-
-import { generateDriverPassCode } from "../../utils/server/auth-driver-passcode";
 
 type Props = {
   data: OptimizedRoutePath;
-} & React.ComponentProps<typeof Card>;
+};
 
-export const AssignedJobSheet: FC<Props> = ({ data }) => {
+export const AssignedJobSheet = ({ data }: Props) => {
   const [open, setOpen] = useState(false);
   const { currentDepot } = useDepot();
-  const driverBundles = useDriverVehicleBundles();
-  const solidarityMessaging = useSolidarityMessaging();
-  const { depotId } = useSolidarityState();
+  const { setActive: setActiveDriver } = useDriverVehicleBundles();
+  const { depotId, routeId } = useSolidarityState();
+
+  const getVehicleById = api.routePlan.getVehicleById.useQuery(
+    { routeId: routeId, vehicleId: data?.vehicleId ?? "" },
+    { enabled: !!routeId && !!data?.vehicleId },
+  );
 
   const color = useMemo(() => getColor(cuidToIndex(data.vehicleId)), [data]);
 
@@ -51,13 +50,11 @@ export const AssignedJobSheet: FC<Props> = ({ data }) => {
     isOnline: false,
     isTracking: false,
   };
-  const driver = driverBundles.getVehicleById(
-    data?.vehicleId ?? data.vehicleId,
-  );
+  const driver = getVehicleById?.data;
 
   const onRouteSheetOpenChange = (state: boolean) => {
-    if (!state) driverBundles.setActive(null);
-    else driverBundles.setActive(data.vehicleId);
+    if (!state) void setActiveDriver(null);
+    else void setActiveDriver(data.vehicleId);
     setOpen(state);
   };
 
@@ -94,20 +91,8 @@ export const AssignedJobSheet: FC<Props> = ({ data }) => {
               driver={driver}
             />
             <SheetFooter className="flex flex-row gap-2">
-              {/* <Button
-                className="flex flex-1 gap-2"
-                variant={"outline"}
-                disabled={!driver?.driver?.email}
-                onClick={() => {
-                  if (!driver?.driver?.email) return;
-                  solidarityMessaging.messageDriver(driver?.driver?.email);
-                }}
-              >
-                <MessageCircle /> Send Message to {driver?.driver?.name}
-              </Button> */}
-
               <Link
-                href={`/tools/solidarity-pathways/${depotId}/route/${data.routeId}/path/${data.id}?driverId=${data.vehicleId}&pc=${passcode}`}
+                href={`/${depotId}/route/${data.routeId}/path/${data.id}?driverId=${data.vehicleId}&pc=${passcode}`}
                 target="_blank"
               >
                 <Button className="">View Route</Button>

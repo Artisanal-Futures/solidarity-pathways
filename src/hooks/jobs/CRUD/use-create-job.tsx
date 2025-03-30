@@ -1,11 +1,12 @@
-import { toastService } from "@dreamwalker-studios/toasts";
+import { useRouter } from "next/navigation";
 import { clientJobDataForNewLatLng } from "~/data/stop-data";
-import { api } from "~/trpc/react";
+
 import type { ClientJobBundle } from "~/types.wip";
+import { api } from "~/trpc/react";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
+
 import { useSolidarityState } from "../../optimized-data/use-solidarity-state";
 import { useStopsStore } from "../use-stops-store";
-
-import { useRouter } from "next/navigation";
 
 type Coordinates = {
   lat: number;
@@ -22,57 +23,29 @@ type TCreateNewJobsProps = {
   addToRoute?: boolean;
 };
 export const useCreateJob = () => {
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["jobs", "routePlan"],
+  });
+
   const { isUserAllowedToSaveToDepot, depotId, routeId, routeDate } =
     useSolidarityState();
 
   const sessionStorageJobs = useStopsStore((state) => state);
 
-  const apiContext = api.useContext();
   const router = useRouter();
 
-  const createJobBundles = api.jobs.createJobBundles.useMutation({
-    onSuccess: () => {
-      toastService.success("Jobs were successfully added to route.");
-    },
-    onError: (e: unknown) => {
-      console.error(e);
-      //toast.error("There was an error adding jobs to route.");
-    },
-    onSettled: () => {
-      void apiContext.jobs.invalidate();
-      void apiContext.routePlan.invalidate();
-    },
-  });
+  const createJobBundles =
+    api.jobs.createJobBundles.useMutation(defaultActions);
 
-  const duplicateJobsToRoute = api.jobs.duplicateJobsToRoute.useMutation({
-    onSuccess: () => {
-      toastService.success("Jobs were successfully added to route.");
-    },
-    onError: (e: unknown) => {
-      console.error(e);
-      //toast.error("There was an error adding jobs to route.");
-    },
-    onSettled: () => {
-      void apiContext.jobs.invalidate();
-      void apiContext.routePlan.invalidate();
-    },
-  });
+  const duplicateJobsToRoute =
+    api.jobs.duplicateJobsToRoute.useMutation(defaultActions);
 
   const createRouteWithJobBundles =
     api.jobs.createRouteFromJobBundles.useMutation({
-      onSuccess: (data) => {
-        toastService.success("Jobs were successfully added to route.");
-        router.push(
-          `/tools/solidarity-pathways/${depotId}/route/${data.route.id}?mode=plan`,
-        );
-      },
-      onError: (e: unknown) => {
-        console.error(e);
-        toastService.error("There was an error adding jobs to route.");
-      },
-      onSettled: () => {
-        void apiContext.jobs.invalidate();
-        void apiContext.routePlan.invalidate();
+      ...defaultActions,
+      onSuccess: ({ data, message }) => {
+        defaultActions.onSuccess({ message });
+        router.push(`/${depotId}/route/${data.route.id}?mode=plan`);
       },
     });
 
@@ -117,44 +90,36 @@ export const useCreateJob = () => {
 
     const doesRouteExist = routeId !== undefined;
 
-    if (isUserAllowedToSaveToDepot) {
-      if (doesRouteExist)
-        createJobBundles.mutate({
-          bundles: filterClientsWithoutEmails,
-          depotId,
-          routeId: addToRoute ? routeId : undefined,
-        });
-      else
-        createRouteWithJobBundles.mutate({
-          bundles: filterClientsWithoutEmails,
-          depotId,
-          date: routeDate ?? new Date(),
-        });
-    } else {
-      filterClientsWithoutEmails.forEach((job) => {
-        sessionStorageJobs.appendLocation(job);
+    if (doesRouteExist)
+      createJobBundles.mutate({
+        bundles: filterClientsWithoutEmails,
+        depotId,
+        routeId: addToRoute ? routeId : undefined,
       });
-    }
+    else
+      createRouteWithJobBundles.mutate({
+        bundles: filterClientsWithoutEmails,
+        depotId,
+        date: routeDate ?? new Date(),
+      });
   };
 
   const duplicateJobIdsToRoute = ({ jobs }: { jobs: string[] }) => {
     const doesRouteExist = routeId !== undefined;
 
-    if (isUserAllowedToSaveToDepot) {
-      if (doesRouteExist)
-        duplicateJobsToRoute.mutate({
-          bundleIds: jobs,
-          depotId,
-          routeId,
-        });
-    }
+    if (doesRouteExist)
+      duplicateJobsToRoute.mutate({
+        bundleIds: jobs,
+        depotId,
+        routeId,
+      });
   };
 
   return {
     createNewJob,
     createNewJobs,
     createNewJobByLatLng,
-    createRouteWithJobBundles,
+
     duplicateJobIdsToRoute,
   };
 };

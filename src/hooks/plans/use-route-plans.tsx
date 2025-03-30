@@ -1,19 +1,19 @@
-import { useSession } from "next-auth/react";
-import { usePathname, useRouter } from "next/navigation";
 import { useMemo } from "react";
-
-import { api } from "~/trpc/react";
-import optimizationService from "../../services/optimization";
-import type { OptimizationPlan } from "../../types.wip";
-import { getUniqueKey } from "../../utils/generic/unique-key";
-import { useDriverVehicleBundles } from "../drivers/use-driver-vehicle-bundles";
-import { useClientJobBundles } from "../jobs/use-client-job-bundles";
-import { useRoutingSolutions } from "./use-routing-solutions";
+import { usePathname, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 import { toastService } from "@dreamwalker-studios/toasts";
+
+import type { OptimizationPlan } from "../../types.wip";
+import { api } from "~/trpc/react";
+
+import optimizationService from "../../services/optimization";
 import { generatePassCode } from "../../utils/generic/generate-passcode";
+import { getUniqueKey } from "../../utils/generic/unique-key";
 import { useDepot } from "../depot/use-depot";
+import { useClientJobBundles } from "../jobs/use-client-job-bundles";
 import { useSolidarityState } from "../optimized-data/use-solidarity-state";
+import { useRoutingSolutions } from "./use-routing-solutions";
 
 export const useRoutePlans = () => {
   const { depotId, routeDate, routeId, dateParam } = useSolidarityState();
@@ -23,7 +23,11 @@ export const useRoutePlans = () => {
   const pathname = usePathname();
   const router = useRouter();
 
-  const driverBundles = useDriverVehicleBundles();
+  const getRouteVehicles = api.routePlan.getVehicleBundles.useQuery(
+    { routeId: routeId },
+    { enabled: !!routeId },
+  );
+
   const jobBundles = useClientJobBundles();
 
   const routingSolutions = useRoutingSolutions();
@@ -50,9 +54,7 @@ export const useRoutePlans = () => {
   const createRoutePlan = api.routePlan.createRoutePlan.useMutation({
     onSuccess: (data) => {
       toastService.success("Route created!");
-      router.push(
-        `/tools/solidarity-pathways/${depotId}/route/${data.id}?mode=plan`,
-      );
+      router.push(`/${depotId}/route/${data.id}?mode=plan`);
     },
     onError: (error) => {
       toastService.error({
@@ -93,7 +95,9 @@ export const useRoutePlans = () => {
 
   const calculateRoutes = async (selectedJobIds?: string[]) => {
     const jobs_bundles = optimizationService.formatClientData(jobBundles.data);
-    const vehicles = optimizationService.formatDriverData(driverBundles.data);
+    const vehicles = optimizationService.formatDriverData(
+      getRouteVehicles?.data ?? [],
+    );
 
     let jobs = jobs_bundles;
 
@@ -126,7 +130,7 @@ export const useRoutePlans = () => {
     } else {
       const uniqueKey = await getUniqueKey({
         locations: jobBundles.data,
-        drivers: driverBundles.data,
+        drivers: getRouteVehicles?.data,
       });
 
       routingSolutions.setRoutingSolutions(uniqueKey, results);
@@ -156,7 +160,7 @@ export const useRoutePlans = () => {
     const bundles = getRoutePlanById.data?.optimizedRoute?.map((route) => {
       return {
         email: route?.vehicle?.driver?.email,
-        url: `http://localhost:3000/tools/solidarity-pathways/${depotId}/route/${routeId}/path/${
+        url: `http://localhost:3000/${depotId}/route/${routeId}/path/${
           route.id
         }?pc=${generatePassCode(route?.vehicle?.driver?.email ?? "")}`,
         passcode: generatePassCode(route?.vehicle?.driver?.email ?? ""),

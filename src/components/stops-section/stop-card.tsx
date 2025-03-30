@@ -1,11 +1,11 @@
-import { useMemo, type FC } from "react";
+import { useMemo } from "react";
 
-import DepotCard from "~/components/shared/depot-card";
-import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
+import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
+import { DepotCard } from "~/components/shared/depot-card";
 
-type TStopCard = { id: string; name: string; address: string };
+type Props = { id: string; name: string; address: string };
 
-const StopCard: FC<TStopCard> = ({ id, name, address }) => {
+export const StopCard = ({ id, name, address }: Props) => {
   const { edit, isActive } = useClientJobBundles();
 
   const onJobEdit = () => edit(id);
@@ -21,5 +21,3 @@ const StopCard: FC<TStopCard> = ({ id, name, address }) => {
     />
   );
 };
-
-export default StopCard;

@@ -1,11 +1,11 @@
 import type { LatLngExpression } from "leaflet";
 import { useMemo } from "react";
-import { api } from "~/trpc/react";
-import type { MapPoint } from "~/types";
-import type { ClientJobBundle, OptimizedStop } from "../../types.wip";
-import { cuidToIndex } from "../../utils/generic/format-utils.wip";
 
-import { useReadDriver } from "../drivers/CRUD/use-read-driver";
+import type { ClientJobBundle, OptimizedStop } from "../../types.wip";
+import type { MapPoint } from "~/types";
+import { api } from "~/trpc/react";
+
+import { cuidToIndex } from "../../utils/generic/format-utils.wip";
 import { useClientJobBundles } from "../jobs/use-client-job-bundles";
 import { useSolidarityState } from "./use-solidarity-state";
 
@@ -27,7 +27,6 @@ type Destination = Map<string, Bundle[]>;
 
 export const useOptimizedRoutePlan = () => {
   const { pathId, routeId } = useSolidarityState();
-  const { getVehicleById } = useReadDriver();
 
   const apiContext = api.useUtils();
 
@@ -48,6 +47,11 @@ export const useOptimizedRoutePlan = () => {
     { enabled: !!routeId },
   );
 
+  const getVehicleById = api.routePlan.getVehicleById.useQuery(
+    { routeId, vehicleId: getOptimizedData.data?.vehicleId ?? "" },
+    { enabled: false },
+  );
+
   const unassigned = getRoutePlan.data?.jobs?.filter((job) => !job.isOptimized);
 
   const jobBundles = useClientJobBundles();
@@ -60,7 +64,7 @@ export const useOptimizedRoutePlan = () => {
     ?.filter((job) => job.type === "job" && job.jobId !== null)
     .map((job) => jobBundles.getJobById(job?.jobId ?? "")) as ClientJobBundle[];
 
-  const currentDriver = getVehicleById(getOptimizedData.data?.vehicleId);
+  const currentDriver = getVehicleById.refetch();
 
   const routeDestinations: Destination = useMemo(() => {
     const destinations = new Map<string, Bundle[]>();

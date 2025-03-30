@@ -1,16 +1,15 @@
 import { ChevronRight } from "lucide-react";
-import { type FC } from "react";
 
 import { cn } from "~/lib/utils";
 
-type TDepotCard = {
+type Props = {
   isActive: boolean;
   title: string;
   subtitle?: string;
   onEdit: () => void;
 };
 
-const DepotCard: FC<TDepotCard> = ({ isActive, title, subtitle, onEdit }) => {
+export const DepotCard = ({ isActive, title, subtitle, onEdit }: Props) => {
   return (
     <div
       className={cn(
@@ -44,5 +43,3 @@ const DepotCard: FC<TDepotCard> = ({ isActive, title, subtitle, onEdit }) => {
     </div>
   );
 };
-
-export default DepotCard;

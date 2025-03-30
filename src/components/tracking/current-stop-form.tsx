@@ -1,12 +1,16 @@
-import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
+import { notificationService } from "~/services/notification";
 import { Navigation, PackageCheckIcon, PackageXIcon } from "lucide-react";
-import { type FC } from "react";
-
 import { useForm } from "react-hook-form";
-import * as z from "zod";
 
+import { zodResolver } from "@hookform/resolvers/zod";
+import { RouteStatus } from "@prisma/client";
+
+import type { OptimizedStop } from "../../types.wip";
+import type { EditStopFormValues } from "~/lib/validators/route-plan";
+import { editStopFormSchema } from "~/lib/validators/route-plan";
+import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
-
 import {
   Form,
   FormControl,
@@ -16,35 +20,20 @@ import {
   FormMessage,
 } from "~/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
-
-import { RouteStatus } from "@prisma/client";
-import Link from "next/link";
 import { AutoResizeTextArea } from "~/components/auto-resize-textarea";
-import { api } from "~/trpc/react";
+
 import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
-
-import { notificationService } from "~/services/notification";
-import type { OptimizedStop } from "../../types.wip";
-
-const notificationsFormSchema = z.object({
-  status: z.nativeEnum(RouteStatus, {
-    required_error: "You need to select a notification type.",
-  }),
-  deliveryNotes: z.string().optional(),
-});
-
-export type EditStopFormValues = z.infer<typeof notificationsFormSchema>;
 
 // This can come from your database or API.
 
-type TProps = {
+type Props = {
   initialData?: OptimizedStop | null;
 };
 
-const CurrentStopForm: FC<TProps> = ({ initialData }) => {
+export const CurrentStopForm = ({ initialData }: Props) => {
   const jobBundles = useClientJobBundles();
 
-  const apiContext = api.useContext();
+  const apiContext = api.useUtils();
 
   const updateStopStatus = api.routePlan.updateOptimizedStopState.useMutation({
     onSuccess: () => {
@@ -70,7 +59,7 @@ const CurrentStopForm: FC<TProps> = ({ initialData }) => {
   };
 
   const form = useForm<EditStopFormValues>({
-    resolver: zodResolver(notificationsFormSchema),
+    resolver: zodResolver(editStopFormSchema),
     defaultValues,
   });
 
@@ -197,5 +186,3 @@ const CurrentStopForm: FC<TProps> = ({ initialData }) => {
     </>
   );
 };
-
-export default CurrentStopForm;

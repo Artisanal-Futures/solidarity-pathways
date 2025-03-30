@@ -1,32 +1,20 @@
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Controller, useForm } from "react-hook-form";
-import type * as z from "zod";
+"use client";
 
-import { Modal } from "~/components/modal";
-import { Button } from "~/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "~/components/ui/form";
-import { Input } from "~/components/ui/input";
-
-import { AutoCompleteDepotBtn } from "~/components/shared/autocomplete-depot-btn";
-
-import { useDepotModal } from "~/hooks/depot/use-depot-modal.wip";
-
-import { depotFormSchema } from "~/schemas.wip";
-import type { DepotValues } from "~/types.wip";
-
-import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { useDepot } from "~/hooks/depot/use-depot";
+import { useForm } from "react-hook-form";
 
-type TDepotForm = z.infer<typeof depotFormSchema>;
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import type { DepotFormData } from "~/lib/validators/depot";
+import type { DepotValues } from "~/types/depot";
+import { depotFormSchema } from "~/lib/validators/depot";
+import { useDepot } from "~/hooks/depot/use-depot";
+import { useDepotModal } from "~/hooks/depot/use-depot-modal.wip";
+import { Button, buttonVariants } from "~/components/ui/button";
+import { Form } from "~/components/ui/form";
+import { Modal } from "~/components/modal";
+
+import { AutoCompleteAddressFormField, InputFormField } from "../inputs";
 
 type Props = {
   initialData: DepotValues | null;
@@ -34,53 +22,29 @@ type Props = {
 export const DepotModal = ({ initialData }: Props) => {
   const depotModal = useDepotModal();
   const { createDepot, updateDepot } = useDepot();
-  const { data: session } = useSession();
 
   const isLoading = initialData ? updateDepot.isPending : createDepot.isPending;
 
-  const form = useForm<TDepotForm>({
+  const form = useForm<DepotFormData>({
     resolver: zodResolver(depotFormSchema),
     defaultValues: {
       name: initialData?.name ?? "",
-      address: initialData?.address
-        ? {
-            formatted: initialData?.address?.formatted,
-            latitude: initialData?.address?.latitude,
-            longitude: initialData?.address?.longitude,
-          }
-        : undefined,
+      address: {
+        formatted: initialData?.address?.formatted ?? undefined,
+        latitude: initialData?.address?.latitude ?? undefined,
+        longitude: initialData?.address?.longitude ?? undefined,
+      },
       magicCode: initialData?.magicCode ?? "",
     },
   });
 
-  const onDepotFormSubmit = (values: TDepotForm) => {
+  const onDepotFormSubmit = (data: DepotFormData) => {
     if (initialData)
       updateDepot.mutate({
-        ...values,
+        ...data,
         depotId: initialData.id,
-        address:
-          values.address?.formatted &&
-          values.address?.latitude &&
-          values.address?.longitude
-            ? { ...values.address }
-            : undefined,
       });
-    else
-      createDepot.mutate({
-        ...values,
-
-        address:
-          values.address?.formatted &&
-          values.address?.latitude &&
-          values.address?.longitude
-            ? { ...values.address }
-            : undefined,
-      });
-  };
-
-  const setLatLng = (lat: number, lng: number) => {
-    form.setValue("address.latitude", lat);
-    form.setValue("address.longitude", lng);
+    else createDepot.mutate({ ...data });
   };
 
   return (
@@ -99,78 +63,46 @@ export const DepotModal = ({ initialData }: Props) => {
           onSubmit={(e) => void form.handleSubmit(onDepotFormSubmit)(e)}
           className="space-y-4"
         >
-          <FormField
-            control={form.control}
+          <InputFormField
+            form={form}
+            disabled={isLoading}
             name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm font-normal text-muted-foreground">
-                  Name
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    disabled={isLoading}
-                    placeholder="e.g. Deep Blue Sea Delivery"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />{" "}
-          <FormField
-            control={form.control}
+            label="Name"
+            placeholder="e.g. Deep Blue Sea Delivery"
+            labelClassName="text-sm font-normal text-muted-foreground"
+          />
+          <InputFormField
+            form={form}
+            disabled={isLoading}
             name="magicCode"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="text-sm font-normal text-muted-foreground">
-                  Magic Code
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    disabled={isLoading}
-                    placeholder="e.g. super-secret-code-1234"
-                    {...field}
-                  />
-                </FormControl>
-                <FormDescription className="text-xs text-muted-foreground/75">
-                  This code allows your drivers to access the route page
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
+            label="Magic Code"
+            placeholder="e.g. super-secret-code-1234"
+            labelClassName="text-sm font-normal text-muted-foreground"
+            descriptionClassName="text-xs text-muted-foreground/75"
           />
-          <Controller
+
+          <AutoCompleteAddressFormField
+            form={form}
             name="address.formatted"
-            control={form.control}
-            render={({ field: { onChange, value } }) => (
-              <FormItem>
-                <FormLabel className="text-sm font-normal text-muted-foreground">
-                  Depot Address
-                </FormLabel>
-
-                <AutoCompleteDepotBtn<TDepotForm>
-                  value={value}
-                  onChange={onChange}
-                  onLatLngChange={setLatLng}
-                  form={form}
-                  formKey="address"
-                />
-
-                <FormDescription className="text-xs text-muted-foreground/75">
-                  Address of the depot. Vehicle starting and ending locations
-                  will default to this location.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
+            labelClassName="text-sm font-normal text-muted-foreground"
+            label="Depot Address"
+            description="Address of the depot. Vehicle starting and ending locations will default to this location."
+            defaultValue={
+              initialData?.address ?? {
+                formatted: "",
+                latitude: 0,
+                longitude: 0,
+              }
+            }
           />
+
           <div className="flex w-full items-center justify-end space-x-2 pt-6">
             {!initialData && (
-              <Link href="/tools/solidarity-pathways/sandbox">
-                <Button variant="outline" type="button">
-                  Nah, I&apos;m good
-                </Button>
+              <Link
+                href="/sandbox"
+                className={buttonVariants({ variant: "outline" })}
+              >
+                Nah, I&apos;m good
               </Link>
             )}
             {initialData && (

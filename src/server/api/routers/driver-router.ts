@@ -1,14 +1,10 @@
-import { TRPCError } from "@trpc/server";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { driverSchema, driverVehicleSchema, vehicleSchema } from "~/types.wip";
 import { z } from "zod";
 
-import {
-  driverSchema,
-  driverVehicleSchema,
-  vehicleSchema,
-  type DriverVehicleBundle,
-} from "~/types.wip";
+import { TRPCError } from "@trpc/server";
 
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import type { DriverVehicleBundle } from "~/types.wip";
 
 export const driverRouter = createTRPCRouter({
   setDepotVehicles: protectedProcedure
@@ -97,17 +93,12 @@ export const driverRouter = createTRPCRouter({
 
           return { driver, vehicle } as DriverVehicleBundle;
         }),
-      )
-        .then((data) => data)
-        .catch((e) => {
-          console.error(e);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Something happened while creating drivers and vehicles",
-          });
-        });
+      );
 
-      return res;
+      return {
+        data: res,
+        message: "Depot drivers were successfully set.",
+      };
     }),
 
   // This creates and adds to existing depots / routes
@@ -278,25 +269,24 @@ export const driverRouter = createTRPCRouter({
 
           return { driver, vehicle } as DriverVehicleBundle;
         }),
-      )
-        .then((data) => data)
-        .catch((e) => {
-          console.error(e);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Something happened while creating drivers and vehicles",
-          });
-        });
+      );
 
-      return res;
+      return {
+        data: res,
+        message: "Driver(s) successfully created.",
+      };
     }),
 
   deleteVehicle: protectedProcedure
-    .input(z.object({ vehicleId: z.string() }))
-    .mutation(({ ctx, input }) => {
-      return ctx.db.vehicle.delete({
-        where: { id: input.vehicleId },
+    .input(z.string())
+    .mutation(async ({ ctx, input: vehicleId }) => {
+      const deletedVehicle = await ctx.db.vehicle.delete({
+        where: { id: vehicleId },
       });
+      return {
+        data: deletedVehicle,
+        message: "Vehicles(s) successfully deleted from route.",
+      };
     }),
 
   deleteDriver: protectedProcedure
@@ -322,19 +312,20 @@ export const driverRouter = createTRPCRouter({
 
       if (driver?.vehicles) {
         await ctx.db.vehicle.deleteMany({
-          where: {
-            id: {
-              in: driver.vehicles.map((v) => v.id),
-            },
-          },
+          where: { id: { in: driver.vehicles.map((v) => v.id) } },
         });
       }
 
-      return ctx.db.driver.delete({
+      const deletedDriver = await ctx.db.driver.delete({
         where: {
           id: input.driverId,
         },
       });
+
+      return {
+        data: deletedDriver,
+        message: "Driver(s) successfully deleted from depot.",
+      };
     }),
 
   updateDriverDefaults: protectedProcedure
@@ -347,9 +338,7 @@ export const driverRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const defaultVehicle = await ctx.db.vehicle.findUnique({
-        where: {
-          id: input.defaultId,
-        },
+        where: { id: input.defaultId },
       });
 
       if (!defaultVehicle) {
@@ -360,20 +349,12 @@ export const driverRouter = createTRPCRouter({
       }
 
       await ctx.db.vehicle.update({
-        where: {
-          id: input.defaultId,
-        },
-        data: {
-          breaks: {
-            deleteMany: {},
-          },
-        },
+        where: { id: input.defaultId },
+        data: { breaks: { deleteMany: {} } },
       });
 
       const updatedVehicle = await ctx.db.vehicle.update({
-        where: {
-          id: defaultVehicle.id,
-        },
+        where: { id: defaultVehicle.id },
         data: {
           startAddress: {
             update: {
@@ -382,7 +363,6 @@ export const driverRouter = createTRPCRouter({
               longitude: input.bundle.vehicle.startAddress.longitude,
             },
           },
-
           shiftStart: input.bundle.vehicle.shiftStart,
           shiftEnd: input.bundle.vehicle.shiftEnd,
           cargo: input.bundle.vehicle.cargo ?? "",
@@ -402,10 +382,13 @@ export const driverRouter = createTRPCRouter({
       });
 
       if (!input.bundle.vehicle.endAddress) {
-        return updatedVehicle;
+        return {
+          data: updatedVehicle,
+          message: "Driver defaults were successfully updated.",
+        };
       }
 
-      return ctx.db.vehicle.update({
+      const updatedVehicleWithEndAddress = await ctx.db.vehicle.update({
         where: {
           id: defaultVehicle.id,
         },
@@ -426,14 +409,18 @@ export const driverRouter = createTRPCRouter({
           },
         },
       });
+      return {
+        data: updatedVehicleWithEndAddress,
+        message: "Driver defaults were successfully updated.",
+      };
     }),
 
   updateDriverDetails: protectedProcedure
-    .input(z.object({ driverId: z.string(), driver: driverSchema }))
-    .mutation(({ ctx, input }) => {
-      return ctx.db.driver.update({
+    .input(z.object({ driver: driverSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const updatedDriver = await ctx.db.driver.update({
         where: {
-          id: input.driverId,
+          id: input.driver.id,
         },
         data: {
           name: input?.driver?.name,
@@ -455,6 +442,11 @@ export const driverRouter = createTRPCRouter({
           },
         },
       });
+
+      return {
+        data: updatedDriver,
+        message: "Driver details were successfully updated.",
+      };
     }),
 
   updateVehicleDetails: protectedProcedure
@@ -465,11 +457,7 @@ export const driverRouter = createTRPCRouter({
           id: input.vehicle.id,
           routeId: input.routeId,
         },
-        data: {
-          breaks: {
-            deleteMany: {},
-          },
-        },
+        data: { breaks: { deleteMany: {} } },
       });
 
       const updatedVehicle = await ctx.db.vehicle.update({
@@ -512,10 +500,13 @@ export const driverRouter = createTRPCRouter({
       });
 
       if (!input.vehicle.endAddress) {
-        return updatedVehicle;
+        return {
+          data: updatedVehicle,
+          message: "Vehicle details were successfully updated.",
+        };
       }
 
-      return ctx.db.vehicle.update({
+      const updatedVehicleWithEndAddress = await ctx.db.vehicle.update({
         where: {
           id: updatedVehicle.id,
         },
@@ -536,6 +527,11 @@ export const driverRouter = createTRPCRouter({
           },
         },
       });
+
+      return {
+        data: updatedVehicleWithEndAddress,
+        message: "Vehicle details were successfully updated.",
+      };
     }),
 
   getDepotDrivers: protectedProcedure
@@ -605,26 +601,28 @@ export const driverRouter = createTRPCRouter({
     }),
 
   deleteAllDepotDrivers: protectedProcedure
-    .input(z.object({ depotId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .input(z.string())
+    .mutation(async ({ ctx, input: depotId }) => {
       const drivers = await ctx.db.driver.deleteMany({
-        where: {
-          depotId: input.depotId,
-        },
+        where: { depotId },
       });
 
-      return drivers;
+      return {
+        data: drivers,
+        message: "Driver(s) successfully purged from depot.",
+      };
     }),
 
   deleteAllVehicles: protectedProcedure
-    .input(z.object({ depotId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+    .input(z.string())
+    .mutation(async ({ ctx, input: depotId }) => {
       const vehicle = await ctx.db.vehicle.deleteMany({
-        where: {
-          depotId: input.depotId,
-        },
+        where: { depotId },
       });
 
-      return vehicle;
+      return {
+        data: vehicle,
+        message: "Vehicle(s) successfully purged from depot.",
+      };
     }),
 });

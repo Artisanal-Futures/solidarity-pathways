@@ -1,3 +1,11 @@
+import * as React from "react";
+
+import type {
+  ColumnFiltersState,
+  PaginationState,
+  SortingState,
+  VisibilityState,
+} from "@tanstack/react-table";
 import {
   flexRender,
   getCoreRowModel,
@@ -7,16 +15,11 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-  type ColumnFiltersState,
-  type PaginationState,
-  type SortingState,
-  type VisibilityState,
 } from "@tanstack/react-table";
 
-import * as React from "react";
-
+import type { ClientJobBundle } from "~/types.wip";
 import { Button } from "~/components/ui/button";
-
+import { ScrollArea, ScrollBar } from "~/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -25,11 +28,8 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-
-import type { ClientJobBundle } from "~/types.wip";
-
-import { JobDepotDataTableToolbar, columns } from "~/components/sheet-job";
-import { ScrollArea, ScrollBar } from "~/components/ui/scroll-area";
+import { jobDepotColumns } from "~/components/sheet-job/job-depot-columns";
+import { JobDepotDataTableToolbar } from "~/components/sheet-job/job-depot-data-table-toolbar";
 
 type Props = {
   data: ClientJobBundle[];
@@ -53,7 +53,7 @@ export function JobDepotDataTable({ storeData, data, setSelectedData }: Props) {
 
   const table = useReactTable({
     data,
-    columns,
+    columns: jobDepotColumns,
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
@@ -138,7 +138,7 @@ export function JobDepotDataTable({ storeData, data, setSelectedData }: Props) {
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={columns.length}
+                      colSpan={jobDepotColumns.length}
                       className="h-24 text-center"
                     >
                       No results.

@@ -1,9 +1,10 @@
+import type { SelectSingleEventHandler } from "react-day-picker";
+import * as React from "react";
 import { format } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
 
-import * as React from "react";
-import type { SelectSingleEventHandler } from "react-day-picker";
-
+import { cn } from "~/lib/utils";
+import { useReadRoutePlans } from "~/hooks/plans/use-read-route-plans";
 import { Button } from "~/components/ui/button";
 import { Calendar } from "~/components/ui/calendar";
 import {
@@ -12,16 +13,13 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 
-import { useReadRoutePlans } from "~/hooks/plans/use-read-route-plans";
-
-import { cn } from "~/lib/utils";
 import { useRoutePlans } from "../../hooks/plans/use-route-plans";
 
-interface IProps {
+type Props = {
   date: Date | undefined;
   setDate: SelectSingleEventHandler;
-}
-export function JobDepotPreviousRouteSelect({ date, setDate }: IProps) {
+};
+export const JobDepotPreviousRouteSelect = ({ date, setDate }: Props) => {
   const { allRoutes } = useRoutePlans();
   const [open, setOpen] = React.useState(false);
   const dateMap = allRoutes.map((route) => route.deliveryAt);
@@ -73,4 +71,4 @@ export function JobDepotPreviousRouteSelect({ date, setDate }: IProps) {
       </PopoverContent>
     </Popover>
   );
-}
+};

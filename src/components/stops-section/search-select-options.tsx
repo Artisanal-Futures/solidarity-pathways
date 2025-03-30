@@ -1,25 +1,14 @@
-import {
-  Check,
-  ChevronsUpDown,
-  Copy,
-  Delete,
-  File,
-  PlusCircle,
-  Store,
-  View,
-} from "lucide-react";
-import { useRouter as useNavigationRouter } from "next/navigation";
-import { useRouter } from "next/router";
-import * as React from "react";
+import { useEffect, useRef, useState } from "react";
+import { Copy, Delete } from "lucide-react";
+
+import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from "~/components/ui/command";
 import {
   Popover,
@@ -27,34 +16,27 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 
-import { cn } from "~/lib/utils";
-
 type PopoverTriggerProps = React.ComponentPropsWithoutRef<
   typeof PopoverTrigger
 >;
 
-interface StoreSwitcherProps extends PopoverTriggerProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-
+type Props = PopoverTriggerProps & {
   listRef: React.RefObject<HTMLElement>;
   inputRef: React.RefObject<HTMLInputElement>;
   handleOnDuplicateJobs: () => void;
   handleOnDeleteJobs: () => void;
-}
+};
 
-export default function SearchSelectOptions({
+export const SearchSelectOptions = ({
   className,
-
   listRef,
   inputRef,
   handleOnDuplicateJobs,
   handleOnDeleteJobs,
-}: StoreSwitcherProps) {
-  // const params = useParams();
-
-  const [open, setOpen] = React.useState(false);
-  const altListRef = React.useRef(null);
-  React.useEffect(() => {
+}: Props) => {
+  const [open, setOpen] = useState(false);
+  const altListRef = useRef(null);
+  useEffect(() => {
     function listener(e: KeyboardEvent) {
       if (e.key === "k" && e.metaKey) {
         e.preventDefault();
@@ -69,7 +51,7 @@ export default function SearchSelectOptions({
     };
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     function listener(e: KeyboardEvent) {
       if (e.key === "Enter" && e.metaKey) {
         e.preventDefault();
@@ -84,7 +66,7 @@ export default function SearchSelectOptions({
     };
   }, [handleOnDuplicateJobs]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     function listener(e: KeyboardEvent) {
       if (e.key === "Delete" && e.metaKey) {
         e.preventDefault();
@@ -99,7 +81,7 @@ export default function SearchSelectOptions({
     };
   }, [handleOnDeleteJobs]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const el = listRef.current;
 
     if (!el) return;
@@ -111,7 +93,7 @@ export default function SearchSelectOptions({
     }
   }, [open, listRef]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!open) {
       setTimeout(() => {
         document.body.style.pointerEvents = "";
@@ -119,7 +101,7 @@ export default function SearchSelectOptions({
     }
   }, [open]);
 
-  const altInputRef = React.useRef<HTMLInputElement>(null);
+  const altInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <Popover open={open} onOpenChange={setOpen} modal>
@@ -190,4 +172,4 @@ export default function SearchSelectOptions({
       </PopoverContent>
     </Popover>
   );
-}
+};

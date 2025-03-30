@@ -1,21 +1,18 @@
-import { ScrollArea } from "~/components/ui/scroll-area";
-
-import StopCard from "~/components/stops-section/stop-card";
-
+import { useMemo } from "react";
 import { Lightbulb } from "lucide-react";
 
-import { useMemo } from "react";
-
+import type { ClientJobBundle } from "../../types.wip";
 import { Button } from "~/components/ui/button";
+import { ScrollArea } from "~/components/ui/scroll-area";
+import { StopCard } from "~/components/stops-section/stop-card";
+
 import { clientJobUploadOptions } from "../../data/stop-data";
 import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
-import type { ClientJobBundle } from "../../types.wip";
 import { FileUploadModal } from "../shared/file-upload-modal.wip";
-
 import { CommandSearchJobs } from "./command-search-jobs";
 import StopOptionBtn from "./stop-option-btn.wip";
 
-const StopsTab = () => {
+export const StopsTab = () => {
   const jobs = useClientJobBundles();
 
   const fileUploadOptions = useMemo(
@@ -92,5 +89,3 @@ const StopsTab = () => {
     </>
   );
 };
-
-export default StopsTab;

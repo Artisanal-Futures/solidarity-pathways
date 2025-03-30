@@ -1,16 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import type { Map as LeafletMap } from "leaflet";
 import { useEffect, useState } from "react";
 
-import type { Map as LeafletMap } from "leaflet";
-
-import "leaflet-geosearch/dist/geosearch.css";
-import "leaflet/dist/leaflet.css";
-
-import { Button } from "~/components/ui/button";
-
-import useMap from "~/hooks/use-map";
+import "~/styles/geosearch.css";
+import "~/styles/leaflet.css";
 
 import { cn } from "~/lib/utils";
+import useMap from "~/hooks/use-map";
+import { Button } from "~/components/ui/button";
 
 export type MapPoint = {
   id: string;
@@ -25,10 +22,9 @@ export type MapPoint = {
 };
 
 export const MapViewButton = ({ mapRef }: { mapRef: LeafletMap }) => {
-  const [enableTracking, setEnableTracking] = useState(true); // was false; browser will ask
+  const [enableTracking] = useState(true); // was false; browser will ask
 
   const [isSimulating, setIsSimulating] = useState(false);
-  const [buttonMessage, setButtonMessage] = useState<string>("");
 
   const params = {
     mapRef,
@@ -45,7 +41,7 @@ export const MapViewButton = ({ mapRef }: { mapRef: LeafletMap }) => {
   useEffect(() => {
     const intervalId = setInterval(() => {
       const message = exportLocationServiceMessage();
-      setButtonMessage(message ?? "");
+      console.log(message);
     }, 1000);
 
     return () => clearInterval(intervalId);
@@ -53,23 +49,6 @@ export const MapViewButton = ({ mapRef }: { mapRef: LeafletMap }) => {
 
   return (
     <div>
-      {/* {pathId && (
-        <Button
-          className={cn(
-            "absolute top-3 right-44 z-[1000]",
-            buttonMessage.includes("Stop") && "bg-red-300",
-            buttonMessage.includes("Get") && "animate-pulse"
-          )}
-          variant={enableTracking ? "secondary" : "default"}
-          onClick={() => {
-            setEnableTracking(!enableTracking);
-            toggleConstantTracking();
-          }}
-        >
-          {buttonMessage}
-        </Button>
-      )} */}
-
       <Button
         className={cn(
           "absolute bottom-10 z-[1000]",
@@ -87,13 +66,6 @@ export const MapViewButton = ({ mapRef }: { mapRef: LeafletMap }) => {
       >
         {isSimulating ? "Stop Demo" : "Start Demo"}
       </Button>
-
-      {/* <Button
-        className="absolute top-3 right-16 z-[1000]"
-        onClick={toggleFlyToTimer}
-      >
-        <Locate size={16} /> {flyToDriver ? 'Stop Centering' : 'Center Map'}
-      </Button> */}
     </div>
   );
 };

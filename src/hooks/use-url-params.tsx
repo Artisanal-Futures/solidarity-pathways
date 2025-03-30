@@ -1,5 +1,5 @@
-import { usePathname, useSearchParams } from "next/navigation";
-import { useRouter } from "next/router";
+"use client";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 type Param = {

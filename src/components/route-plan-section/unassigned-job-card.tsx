@@ -1,7 +1,8 @@
 import { Pencil } from "lucide-react";
-import { Card, CardHeader, CardTitle } from "~/components/ui/card";
+
 import { cn } from "~/lib/utils";
-import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
+import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
+import { Card, CardHeader, CardTitle } from "~/components/ui/card";
 
 type Props = {
   address: string;

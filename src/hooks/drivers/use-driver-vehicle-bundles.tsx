@@ -1,132 +1,172 @@
+import { driverVehicleDataForNewLatLng } from "~/data/driver-data";
 import { useDriversStore } from "~/stores/use-drivers-store";
 
+import type { Coordinates } from "~/types/geolocation";
+import { api } from "~/trpc/react";
 import { useUrlParams } from "~/hooks/use-url-params";
 
-import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
-import { useCreateDriver } from "./CRUD/use-create-driver";
-import { useDeleteDriver } from "./CRUD/use-delete-driver";
+import { useSolidarityState } from "../optimized-data/use-solidarity-state";
+import { useDefaultMutationActions } from "../use-default-mutation-actions";
+import { useSolidarityMessaging } from "../use-solidarity-messaging";
 import { useReadDriver } from "./CRUD/use-read-driver";
-import { useUpdateDriver } from "./CRUD/use-update-driver";
 
 export const useDriverVehicleBundles = () => {
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["drivers", "routePlan"],
+  });
+
   const { updateUrlParams } = useUrlParams();
-  const { isUserAllowedToSaveToDepot } = useSolidarityState();
+  const getVehicleByIdControlledMutation =
+    api.routePlan.getVehicleByIdControlled.useMutation({
+      onSettled: defaultActions.onSettled,
+    });
+
+  const { depotId, routeId } = useSolidarityState();
+
+  const { createDriverChannels } = useSolidarityMessaging();
 
   const readDriver = useReadDriver();
-  const createDriver = useCreateDriver();
-  const updateDriver = useUpdateDriver();
-  const deleteDriver = useDeleteDriver();
 
   const sessionStorageDrivers = useDriversStore((state) => state);
 
-  const setActiveDriver = (id: string | null) => {
-    updateUrlParams({
-      key: "driverId",
-      value: id,
-    });
+  const setActiveDriver = async (id: string | null) => {
+    updateUrlParams({ key: "driverId", value: id });
 
-    const driver = isUserAllowedToSaveToDepot
-      ? readDriver.checkIfDriverExistsInRoute(id)
-      : readDriver.checkIfDriverExistsInStorage(id);
+    const driver = await getVehicleByIdControlledMutation.mutateAsync({
+      routeId,
+      vehicleId: id ?? "",
+    });
 
     if (!driver) {
       sessionStorageDrivers.setActiveDriverById(null);
       return;
     }
 
-    if (!isUserAllowedToSaveToDepot)
-      sessionStorageDrivers.setActiveDriverById(id);
-    else sessionStorageDrivers.setActiveDriver(driver);
+    sessionStorageDrivers.setActiveDriver(driver);
   };
 
-  // useEffect(() => {
-  //   const driverId = getUrlParam("driverId");
-  //   if (driverId) setActiveDriver(driverId);
+  const findDriverByEmailMutation = api.routePlan.getDriverByEmail.useMutation({
+    onSettled: defaultActions.onSettled,
+  });
 
-  //   // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, []);
+  const findDriverByEmail = async (email: string | null) => {
+    if (!email) return null;
+    const driver = await findDriverByEmailMutation.mutateAsync({
+      email,
+      routeId,
+    });
 
-  const findDriverByEmail = (email: string | null) => {
-    return (
-      readDriver.routeDrivers.find((driver) => driver.driver.email === email) ??
-      null
-    );
+    return driver;
   };
+
+  ///////////////////////////////
+  /////// Create  /////////////
+  ///////////////////////////////
+
+  const createVehicleBundles =
+    api.drivers.createVehicleBundles.useMutation(defaultActions);
+
+  const overrideCurrentRoutes = api.routePlan.setRouteVehicles.useMutation({
+    ...defaultActions,
+    onSettled: () => {
+      defaultActions.onSettled();
+      sessionStorageDrivers.setIsDriverSheetOpen(false);
+      sessionStorageDrivers.setActiveDriver(null);
+    },
+  });
+
+  const createNewDriverByLatLng = async ({
+    latitude,
+    longitude,
+  }: Coordinates) => {
+    const driver = driverVehicleDataForNewLatLng(latitude, longitude);
+
+    const { data } = await createVehicleBundles.mutateAsync({
+      data: [driver],
+      depotId,
+      routeId: routeId,
+    });
+
+    const driverIds = data.map((driver) => driver.driver.id);
+
+    createDriverChannels.mutate({
+      depotId: depotId,
+      bundles: driverIds,
+    });
+  };
+
+  ///////////////////////////////
+  /////// Delete  /////////////
+  ///////////////////////////////
+
+  const deleteVehicleMutation =
+    api.drivers.deleteVehicle.useMutation(defaultActions);
+
+  const deleteDriverMutation =
+    api.drivers.deleteVehicleBundle.useMutation(defaultActions);
+
+  const purgeAllDriversMutation =
+    api.drivers.deleteAllDepotDrivers.useMutation(defaultActions);
+
+  ///////////////////////////////
+  /////// Update  /////////////
+  ///////////////////////////////
+
+  const updateDriverDefaultsMutation =
+    api.drivers.updateDriverDefaults.useMutation(defaultActions);
+
+  const updateDriverChannelMutation =
+    api.routeMessaging.updateDriverChannelByEmail.useMutation(defaultActions);
+
+  const updateVehicleDetailsMutation =
+    api.drivers.updateVehicleDetails.useMutation(defaultActions);
+
+  const updateDriverDetailsMutation =
+    api.drivers.updateDriverDetails.useMutation(defaultActions);
+
   return {
-    data: readDriver.routeDrivers,
-    isDataLoading: readDriver.isLoading,
-
     active: sessionStorageDrivers.activeDriver,
     setActive: setActiveDriver,
     isActive: (id: string) => {
       return sessionStorageDrivers.activeDriver?.vehicle.id === id;
     },
 
-    depot: readDriver.depotDrivers,
-
-    getVehicleById: readDriver.getVehicleById,
-
-    create: createDriver.createNewDriver,
-    createMany: createDriver.createNewDrivers,
-    createByLatLng: createDriver.createNewDriverByLatLng,
-
-    updateDefaults: updateDriver.updateDepotDriverDefaults,
-    updateDepotDriver: updateDriver.updateDepotDriverDetails,
-    updateDriver: updateDriver.updateRouteVehicle,
-
-    deleteFromRoute: deleteDriver.deleteDriverFromRoute,
-    deleteFromDepot: deleteDriver.deleteDriverFromDepot,
-
-    deleteAllDrivers: deleteDriver.purgeAllDrivers,
-    deleteAllVehicles: deleteDriver.purgeAllVehicles,
-    deleteAll: deleteDriver.purgeAllDriverVehicleBundles,
-
     edit: (id: string) => {
-      setActiveDriver(id);
+      void setActiveDriver(id);
       sessionStorageDrivers.setIsDriverSheetOpen(true);
     },
 
     isSheetOpen: sessionStorageDrivers.isDriverSheetOpen,
     onSheetOpenChange: (state: boolean) => {
-      if (!state) setActiveDriver(null);
+      if (!state) void setActiveDriver(null);
       sessionStorageDrivers.setIsDriverSheetOpen(state);
     },
 
-    assign: createDriver.setRouteDrivers,
-
-    isMessageSheetOpen: sessionStorageDrivers.isDriverMessagePanelOpen,
-    onMessageSheetOpenChange: (state: boolean) => {
-      if (!state) setActiveDriver(null);
-      sessionStorageDrivers.setIsDriverMessagePanelOpen(state);
-    },
-
-    message: (id: string) => {
-      setActiveDriver(id);
-      sessionStorageDrivers.setIsDriverMessagePanelOpen(true);
-    },
-
-    isRouteSheetOpen: sessionStorageDrivers.isDriverRoutePanelOpen,
-    onRouteSheetOpenChange: (state: boolean) => {
-      if (!state) setActiveDriver(null);
-      if (!state)
-        updateUrlParams({
-          key: "optimizedId",
-          value: null,
-        });
-
-      sessionStorageDrivers.setIsDriverRoutePanelOpen(state);
-    },
-
-    route: (id: string, routeId: string) => {
-      setActiveDriver(id);
-      updateUrlParams({
-        key: "optimizedId",
-        value: routeId,
-      });
-
-      sessionStorageDrivers.setIsDriverRoutePanelOpen(true);
-    },
-
     findDriverByEmail,
+
+    ///////////////////////////////
+    /////// Create  /////////////
+    ///////////////////////////////
+
+    createNewDriverByLatLng,
+    overrideCurrentRoutes,
+    createVehicleBundles,
+
+    ///////////////////////////////
+    /////// Delete  /////////////
+    ///////////////////////////////
+
+    deleteVehicleMutation,
+    deleteDriverMutation,
+    purgeAllDriversMutation,
+
+    ///////////////////////////////
+    /////// Update  /////////////
+    ///////////////////////////////
+
+    updateVehicleDetailsMutation,
+    updateDriverChannelMutation,
+    updateDriverDefaultsMutation,
+    updateDriverDetailsMutation,
   };
 };

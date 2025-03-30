@@ -1,3 +1,4 @@
+"use client";
 import { useEffect } from "react";
 
 import { useDepotModal } from "~/hooks/depot/use-depot-modal.wip";

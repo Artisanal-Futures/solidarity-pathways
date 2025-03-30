@@ -1,12 +1,11 @@
 import type { ElementType, FC, HTMLAttributes } from "react";
 
+import type { DriverVehicleBundle, OptimizedStop } from "~/types.wip";
+import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
-
 import StepLineSegment from "~/components/other/step-line-segment";
 
-import { cn } from "~/lib/utils";
-import type { DriverVehicleBundle, OptimizedStop } from "~/types.wip";
 import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
 
 type RouteBreakdownProps = {

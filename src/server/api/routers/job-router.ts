@@ -1,13 +1,10 @@
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-import {
-  clientJobSchema,
-  clientSchema,
-  jobSchema,
-  type ClientJobBundle,
-} from "~/types.wip";
-
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { clientJobSchema, clientSchema, jobSchema } from "~/types.wip";
+import { z } from "zod";
+
+import { TRPCError } from "@trpc/server";
+
+import type { ClientJobBundle } from "~/types.wip";
 
 export const jobRouter = createTRPCRouter({
   // Batch create jobs (and possibly clients) for a route
@@ -103,17 +100,12 @@ export const jobRouter = createTRPCRouter({
 
           return { client, job } as ClientJobBundle;
         }),
-      )
-        .then((data) => data)
-        .catch((e) => {
-          console.error(e);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Something happened while creating the jobs and clients",
-          });
-        });
+      );
 
-      return res;
+      return {
+        data: res,
+        message: "Jobs were successfully added to route.",
+      };
     }),
 
   duplicateJobsToRoute: protectedProcedure
@@ -226,17 +218,12 @@ export const jobRouter = createTRPCRouter({
 
           return { client, job } as ClientJobBundle;
         }),
-      )
-        .then((data) => data)
-        .catch((e) => {
-          console.error(e);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Something happened while creating the jobs and clients",
-          });
-        });
+      );
 
-      return res;
+      return {
+        data: res,
+        message: "Jobs were successfully added to route.",
+      };
     }),
 
   createRouteFromJobBundles: protectedProcedure
@@ -340,17 +327,12 @@ export const jobRouter = createTRPCRouter({
 
           return { client, job } as ClientJobBundle;
         }),
-      )
-        .then((data) => data)
-        .catch((e) => {
-          console.error(e);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Something happened while creating the jobs and clients",
-          });
-        });
+      );
 
-      return { res, route };
+      return {
+        data: { res, route },
+        message: "Jobs were successfully added to route.",
+      };
     }),
 
   updateRouteJob: protectedProcedure
@@ -535,7 +517,10 @@ export const jobRouter = createTRPCRouter({
         },
       });
 
-      return clients;
+      return {
+        data: clients,
+        message: "Clients deleted!",
+      };
     }),
 
   searchForJobs: protectedProcedure

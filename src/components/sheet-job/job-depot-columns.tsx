@@ -1,10 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-import { type ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 import * as React from "react";
+import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 
+import type { Address } from "@prisma/client";
+import type { ColumnDef } from "@tanstack/react-table";
+
+import type { ClientJobBundle } from "~/types.wip";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
@@ -15,14 +18,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { JobDepotEditOption } from "~/components/sheet-job/job-depot-edit-option";
 
-import type { Address } from "@prisma/client";
-
-import type { ClientJobBundle } from "~/types.wip";
-
-import { JobDepotEditOption } from "~/components/sheet-job";
-
-export const columns: ColumnDef<ClientJobBundle>[] = [
+export const jobDepotColumns: ColumnDef<ClientJobBundle>[] = [
   {
     id: "select",
     header: ({ table }) => (

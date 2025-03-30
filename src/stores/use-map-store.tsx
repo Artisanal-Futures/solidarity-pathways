@@ -2,6 +2,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { create } from "zustand";
 
+type LocationMessage = {
+  error: boolean;
+  message: string;
+};
+
 interface MapState {
   flyToDriver: boolean;
   constantTracking: boolean;
@@ -9,8 +14,8 @@ interface MapState {
   setFlyToDriver: (value: boolean) => void;
   setConstantTracking: (value: boolean) => void;
   setIsSimulatingGPS: (value: boolean) => void;
-  locationMessage: Record<string, unknown>;
-  setLocationMessage: (value: Record<string, unknown>) => void;
+  locationMessage: LocationMessage;
+  setLocationMessage: (value: LocationMessage) => void;
 }
 
 export const useMapStore = create<MapState>()((set) => ({

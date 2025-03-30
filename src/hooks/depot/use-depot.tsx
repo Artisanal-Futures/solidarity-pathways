@@ -1,10 +1,14 @@
-import { redirect } from "next/navigation";
-import { useRouter } from "next/router";
+"use client";
+
+import { redirect, useRouter } from "next/navigation";
 
 import { toastService } from "@dreamwalker-studios/toasts";
+
 import { api } from "~/trpc/react";
+
 import { useSolidarityState } from "../optimized-data/use-solidarity-state";
 import { useDepotModal } from "./use-depot-modal.wip";
+
 export const useDepot = () => {
   const { depotId } = useSolidarityState();
   const apiContext = api.useUtils();
@@ -16,18 +20,13 @@ export const useDepot = () => {
     { enabled: !!depotId },
   );
 
-  const createDepot = api.depots.createDepot.useMutation({
-    onSuccess: ({ id, ownerId }) =>
+  const createDepot = api.depots.create.useMutation({
+    onSuccess: ({ data }) =>
       createDepotServer.mutate({
-        depotId: id,
-        ownerId: ownerId,
+        depotId: data.id,
+        ownerId: data.ownerId,
       }),
-    onError: (error) =>
-      toastService.error({
-        message:
-          "Something went wrong with creating the depot. Please try again.",
-        error,
-      }),
+    onError: (error) => toastService.error({ message: error?.message, error }),
   });
 
   const createDepotServer = api.routeMessaging.createNewDepotServer.useMutation(
@@ -35,49 +34,34 @@ export const useDepot = () => {
       onSuccess: (data) => {
         const depot = data.server.inviteCode.split("-")[1];
 
-        void router.push(
-          `/tools/solidarity-pathways/${depot}/overview?welcome=true`,
-        );
+        void router.push(`/${depot}/overview?welcome=true`);
+
         toastService.success(
           "Depot and messaging server has been successfully created.",
         );
       },
       onError: (error) =>
-        toastService.error({
-          message:
-            "Something went wrong with creating the messaging server. Please try again.",
-          error,
-        }),
+        toastService.error({ message: error?.message, error }),
+      onSettled: () => void apiContext.routeMessaging.invalidate(),
     },
   );
 
-  const updateDepot = api.depots.updateDepot.useMutation({
-    onSuccess: () => toastService.success("Depot was successfully updated."),
-    onError: (error) =>
-      toastService.error({
-        message:
-          "Something went wrong with updating the depot. Please try again.",
-        error,
-      }),
+  const updateDepot = api.depots.update.useMutation({
+    onSuccess: ({ message }) => toastService.success(message),
+    onError: (error) => toastService.error({ message: error?.message, error }),
     onSettled: () => {
       void apiContext.depots.invalidate();
       depotModal.onClose();
     },
   });
 
-  const deleteDepot = api.depots.deleteDepot.useMutation({
-    onSuccess: () => {
-      toastService.success("Depot deleted!");
-      void redirect("/tools/solidarity-pathways/");
+  const deleteDepot = api.depots.delete.useMutation({
+    onSuccess: ({ message }) => {
+      toastService.success(message);
+      void redirect("/");
     },
-    onError: (error) =>
-      toastService.error({
-        error,
-        message: "There seems to be an issue with deleting your depot.",
-      }),
-    onSettled: () => {
-      void apiContext.depots.invalidate();
-    },
+    onError: (error) => toastService.error({ message: error?.message, error }),
+    onSettled: () => void apiContext.depots.invalidate(),
   });
 
   return {

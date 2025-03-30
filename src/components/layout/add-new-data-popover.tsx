@@ -1,19 +1,16 @@
 import { Plus, UserPlus } from "lucide-react";
-import { Button } from "~/components/ui/button";
 
 import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
-
-import { ImportDriversButton } from "~/components/overview/import-drivers-button";
-
-import { PathwaySettingsButton } from "~/components/overview/pathways-settings-button";
-
+import { Button } from "~/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { ImportDriversButton } from "~/app/[depotId]/overview/_components/import-drivers-button";
+import { PathwaySettingsButton } from "~/app/[depotId]/overview/_components/pathways-settings-button";
 
-export function AddNewDataPopover() {
+export const AddNewDataPopover = () => {
   const { onSheetOpenChange } = useDriverVehicleBundles();
 
   const addSingleDriver = () => onSheetOpenChange(true);
@@ -31,12 +28,6 @@ export function AddNewDataPopover() {
       </PopoverTrigger>
       <PopoverContent align="end" className="w-fit">
         <div className="">
-          {/* <div className="space-y-2">
-            <h4 className="font-medium leading-none">Quick Add</h4>
-            <p className="text-sm text-muted-foreground">
-              Add new data to the route & depot.
-            </p>
-          </div> */}
           <div className="flex flex-col items-start bg-white text-left">
             <Button
               className="mx-0 flex gap-2 px-0"
@@ -54,4 +45,4 @@ export function AddNewDataPopover() {
       </PopoverContent>
     </Popover>
   );
-}
+};

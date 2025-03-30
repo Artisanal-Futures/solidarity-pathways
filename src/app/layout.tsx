@@ -1,9 +1,10 @@
-import "~/styles/globals.css";
-
+import { Toaster } from "@dreamwalker-studios/toasts";
 import { GeistSans } from "geist/font/sans";
 import { type Metadata } from "next";
-
+import { auth } from "~/server/auth";
+import "~/styles/globals.css";
 import { TRPCReactProvider } from "~/trpc/react";
+import SessionProviderClientComponent from "./(auth)/_components/session-provider-client-component";
 
 export const metadata: Metadata = {
   title: "Solidarity Pathways",
@@ -11,13 +12,19 @@ export const metadata: Metadata = {
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const session = await auth();
   return (
     <html lang="en" className={`${GeistSans.variable}`}>
       <body>
-        <TRPCReactProvider>{children}</TRPCReactProvider>
+        <SessionProviderClientComponent session={session}>
+          <TRPCReactProvider>
+            <Toaster />
+            {children}
+          </TRPCReactProvider>
+        </SessionProviderClientComponent>
       </body>
     </html>
   );

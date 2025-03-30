@@ -1,23 +1,17 @@
-import type { FC } from "react";
-import React from "react";
-
-import { ChevronRight } from "lucide-react";
-
-import { CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-
-import { cn } from "~/lib/utils";
-
-import OnlineIndicator from "~/components/other/online-indicator";
-
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
-
-import { formatWord } from "../../utils/format-word";
+import { formatWord } from "~/utils/format-word";
 import {
   metersToMiles,
   unixSecondsToStandardTime,
-} from "../../utils/generic/format-utils.wip";
+} from "~/utils/generic/format-utils.wip";
+import { ChevronRight } from "lucide-react";
 
-type RouteHeaderCardProps = {
+import { cn } from "~/lib/utils";
+import { api } from "~/trpc/react";
+import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
+import { CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import OnlineIndicator from "~/components/other/online-indicator";
+
+type Props = {
   routeStatus: string;
   startTime: number | null;
   endTime: number | null;
@@ -29,7 +23,7 @@ type RouteHeaderCardProps = {
   isButton?: boolean;
 } & React.ComponentProps<typeof CardHeader>;
 
-export const AssignedJobHeaderCard: FC<RouteHeaderCardProps> = ({
+export const AssignedJobHeaderCard = ({
   vehicleId,
   startTime,
   routeStatus,
@@ -39,9 +33,14 @@ export const AssignedJobHeaderCard: FC<RouteHeaderCardProps> = ({
   className,
   isOnline = false,
   isButton = false,
-}) => {
-  const driverBundles = useDriverVehicleBundles();
-  const driverBundle = driverBundles.getVehicleById(vehicleId);
+}: Props) => {
+  const { routeId } = useSolidarityState();
+
+  const getVehicleById = api.routePlan.getVehicleById.useQuery(
+    { routeId, vehicleId },
+    { enabled: !!routeId && !!vehicleId },
+  );
+  const driverBundle = getVehicleById.data;
 
   const status = formatWord(routeStatus);
 

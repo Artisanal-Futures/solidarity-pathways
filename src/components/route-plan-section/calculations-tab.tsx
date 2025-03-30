@@ -1,14 +1,12 @@
-import { ScrollArea } from "~/components/ui/scroll-area";
-
-import { useRoutePlans } from "../../hooks/plans/use-route-plans";
-import type { OptimizedRoutePath } from "../../types.wip";
-
+import type { OptimizedRoutePath } from "~/types/route";
+import { useRoutePlans } from "~/hooks/plans/use-route-plans";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
+import { ScrollArea } from "~/components/ui/scroll-area";
 
 import { AssignedJobSheet } from "./assigned-job-sheet";
 import { UnassignedJobCard } from "./unassigned-job-card";
@@ -18,13 +16,13 @@ const CalculationsTab = () => {
 
   const numberOfUnassigned = routePlan.unassigned.length;
   const numberOfNotStarted = routePlan.optimized.filter(
-    (r) => r.status === "NOT_STARTED"
+    (r) => r.status === "NOT_STARTED",
   ).length;
   const numberOfInProgress = routePlan.optimized.filter(
-    (r) => r.status === "IN_PROGRESS"
+    (r) => r.status === "IN_PROGRESS",
   ).length;
   const numberOfCompleted = routePlan.optimized.filter(
-    (r) => r.status === "COMPLETED"
+    (r) => r.status === "COMPLETED",
   ).length;
 
   return (
@@ -40,7 +38,7 @@ const CalculationsTab = () => {
         </div>
       </div>
 
-      <ScrollArea className=" flex-1  px-4">
+      <ScrollArea className="flex-1 px-4">
         <Accordion type="multiple" defaultValue={["item-1"]}>
           <AccordionItem value="item-0">
             <AccordionTrigger className="py-2 text-xs">
