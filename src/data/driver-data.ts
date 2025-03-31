@@ -1,16 +1,14 @@
-import { uniqueId } from "lodash";
-
-import {
-  driverTypeSchema,
-  type DriverVehicleBundle,
-  type UploadOptions,
-} from "~/types.wip";
+import { driverTypeSchema } from "~/types.wip";
 import { handleDriverSheetUpload } from "~/utils/driver-vehicle/parse-drivers.wip";
 import {
   milesToMeters,
   militaryTimeToUnixSeconds,
   minutesToSeconds,
 } from "~/utils/generic/format-utils.wip";
+import { uniqueId } from "lodash";
+
+import type { UploadOptions } from "~/types.wip";
+import { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
 
 interface IUploadOptions {
   drivers: DriverVehicleBundle[];

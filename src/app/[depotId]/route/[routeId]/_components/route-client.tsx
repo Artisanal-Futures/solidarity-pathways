@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { notificationService } from "~/services/notification";
+import { useStopsStore } from "~/stores/use-stops-store";
 import {
   ArrowRight,
   Building,
@@ -23,10 +24,9 @@ import { useAutoAnimate } from "@formkit/auto-animate/react";
 import type { Customer } from "~/types";
 import { pusherClient } from "~/lib/soketi/client";
 import { api } from "~/trpc/react";
-import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
-import { useStopsStore } from "~/hooks/jobs/use-stops-store";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { useRoutePlans } from "~/hooks/plans/use-route-plans";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import { useMassMessage } from "~/hooks/use-mass-message";
 import { useUrlParams } from "~/hooks/use-url-params";
 import { Button } from "~/components/ui/button";
@@ -35,9 +35,9 @@ import { AbsolutePageLoader } from "~/components/absolute-page-loader";
 import RouteLayout from "~/components/layout/route-layout";
 import { ViewPathsMobileDrawer } from "~/components/mobile/view-paths-mobile-drawer";
 import CalculationsTab from "~/components/route-plan-section/calculations-tab";
-import { JobClientSheet } from "~/components/sheet-job/job-client-sheet";
 import { StopsTab } from "~/components/stops-section/stops-tab";
-import { DriverVehicleSheet } from "~/app/[depotId]/_components/sheet-driver/driver-vehicle-sheet";
+import { JobClientSheet } from "~/app/[depotId]/_components/client/job-client-sheet";
+import { DriverVehicleSheet } from "~/app/[depotId]/_components/driver/driver-vehicle-sheet";
 import { MessageSheet } from "~/app/[depotId]/route/[routeId]/_components/messaging/message-sheet";
 
 import { makeOneClientJob } from "../_utils/make-one-client-job";
@@ -52,8 +52,21 @@ const LazyRoutingMap = dynamic(() => import("~/components/map/routing-map"), {
  * Page component that allows users to generate routes based on their input.
  */
 export const RouteClient = () => {
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["routePlan", "routeMessaging"],
+  });
+
+  const { routeId, depotId } = useSolidarityState();
+  const getRouteJobs = api.routePlan.getJobBundles.useQuery(
+    { routeId },
+    { enabled: !!routeId },
+  );
+
   const apiContext = api.useUtils();
-  const { routeId } = useSolidarityState();
+
+  const createJobBundles = api.job.createMany.useMutation({
+    ...defaultActions,
+  });
 
   const buildJobsMutation = api.clients.import.useMutation({
     onSuccess: ({ data, message }) => {
@@ -61,9 +74,16 @@ export const RouteClient = () => {
 
       data?.forEach((jobData: Customer) => {
         const one_job = makeOneClientJob(jobData);
-        jobs.create({
-          job: one_job,
-          addToRoute: true,
+
+        createJobBundles.mutate({
+          bundles: [
+            {
+              job: one_job.job,
+              client: one_job.client?.email ? one_job.client : undefined,
+            },
+          ],
+          depotId,
+          routeId,
         });
 
         console.log(
@@ -78,11 +98,7 @@ export const RouteClient = () => {
   });
 
   const clearOptimizedStops =
-    api.routePlan.clearOptimizedStopsFromRoute.useMutation({
-      onSuccess: ({ message }) => toastService.success(message),
-      onError: (error) => toastService.error(error?.message),
-      onSettled: () => void apiContext.routePlan.invalidate(),
-    });
+    api.routePlan.clearOptimizedStopsFromRoute.useMutation(defaultActions);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -95,7 +111,6 @@ export const RouteClient = () => {
     { enabled: !!routeId },
   );
 
-  const jobBundles = useClientJobBundles();
   const routePlans = useRoutePlans();
 
   useEffect(() => {
@@ -146,11 +161,9 @@ export const RouteClient = () => {
   };
 
   const isRouteDataMissing =
-    jobBundles.data.length === 0 || getRouteVehicles?.data?.length === 0;
+    getRouteJobs?.data?.length === 0 || getRouteVehicles?.data?.length === 0;
 
   const { massSendRouteEmails, isLoading } = useMassMessage();
-
-  const jobs = useClientJobBundles();
 
   const { setSelectedJobIds, selectedJobIds } = useStopsStore.getState();
 

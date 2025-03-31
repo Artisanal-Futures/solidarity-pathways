@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useClient } from "~/providers/client";
 import { notificationService } from "~/services/notification";
 import { Navigation, PackageCheckIcon, PackageXIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -22,8 +23,6 @@ import {
 import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
 import { AutoResizeTextArea } from "~/components/auto-resize-textarea";
 
-import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
-
 // This can come from your database or API.
 
 type Props = {
@@ -31,7 +30,7 @@ type Props = {
 };
 
 export const CurrentStopForm = ({ initialData }: Props) => {
-  const jobBundles = useClientJobBundles();
+  const { onFieldJobSheetOpen } = useClient();
 
   const apiContext = api.useUtils();
 
@@ -48,7 +47,7 @@ export const CurrentStopForm = ({ initialData }: Props) => {
       });
     },
     onSettled: () => {
-      jobBundles.onFieldJobSheetOpen(false);
+      onFieldJobSheetOpen(false);
       void apiContext.routePlan.invalidate();
     },
   });

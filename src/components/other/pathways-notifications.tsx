@@ -1,28 +1,27 @@
+import { useState } from "react";
+import { useDriver } from "~/providers/driver";
 import { Bell, Car } from "lucide-react";
 
-import { Button } from "~/components/ui/button";
-
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
 import { useSolidarityMessaging } from "~/hooks/use-solidarity-messaging";
 import { useSolidarityNotifications } from "~/hooks/use-solidarity-notifications";
-
-import { useState } from "react";
+import { Button } from "~/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
+
 import { useSolidarityState } from "../../hooks/optimized-data/use-solidarity-state";
 
 export const PathwaysNotifications = () => {
   const [open, setOpen] = useState(false);
   const solidarityNotifications = useSolidarityNotifications();
-  const { setActive: setActiveDriver, findDriverByEmail } =
-    useDriverVehicleBundles();
+
+  const { setActiveDriverId, findDriverByEmail } = useDriver();
   const { messageDepotById, messageDriverById } = useSolidarityMessaging();
   const { pathId } = useSolidarityState();
 
-  const updateMessageThread = ({
+  const updateMessageThread = async ({
     profileId,
     channelId,
     name,
@@ -35,7 +34,8 @@ export const PathwaysNotifications = () => {
       channelId,
       profileId,
     });
-    setActiveDriver(findDriverByEmail(name)?.vehicle.id ?? null);
+    const driver = await findDriverByEmail(name);
+    setActiveDriverId(driver?.vehicle.id ?? null);
     pathId ? messageDepotById(channelId) : messageDriverById(channelId);
   };
 

@@ -1,12 +1,12 @@
+import { useDriver } from "~/providers/driver";
 import { Users } from "lucide-react";
 
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
 import { Button } from "~/components/ui/button";
 
 type Props = { text?: string };
 
 export const DriverVehicleSheetBtn = ({ text = "Manage Drivers" }: Props) => {
-  const { onSheetOpenChange } = useDriverVehicleBundles();
+  const { onSheetOpenChange } = useDriver();
 
   const openDriverVehicleSheet = () => onSheetOpenChange(true);
 

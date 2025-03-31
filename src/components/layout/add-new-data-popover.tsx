@@ -1,6 +1,8 @@
+"use client";
+
+import { useDriver } from "~/providers/driver";
 import { Plus, UserPlus } from "lucide-react";
 
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
 import { Button } from "~/components/ui/button";
 import {
   Popover,
@@ -11,7 +13,7 @@ import { ImportDriversButton } from "~/app/[depotId]/overview/_components/import
 import { PathwaySettingsButton } from "~/app/[depotId]/overview/_components/pathways-settings-button";
 
 export const AddNewDataPopover = () => {
-  const { onSheetOpenChange } = useDriverVehicleBundles();
+  const { onSheetOpenChange } = useDriver();
 
   const addSingleDriver = () => onSheetOpenChange(true);
 

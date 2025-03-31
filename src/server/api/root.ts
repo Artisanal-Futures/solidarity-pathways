@@ -1,11 +1,14 @@
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
+
+import { clientRouterAlt } from "./routers/client";
 import { clientRouter } from "./routers/clients";
 import { depotRouter } from "./routers/depot-router";
-import { driverRouter } from "./routers/driver-router";
+import { driverRouter } from "./routers/driver";
 import { driverRouter2 } from "./routers/driver-router2";
-import { jobRouter } from "./routers/job-router";
+import { jobRouter } from "./routers/job";
 import { routePlanRouter } from "./routers/route-plan";
 import { solidarityPathwaysMessagingRouter } from "./routers/routing";
+import { vehicleRouter } from "./routers/vehicle";
 
 /**
  * This is the primary router for your server.
@@ -14,13 +17,17 @@ import { solidarityPathwaysMessagingRouter } from "./routers/routing";
  */
 export const appRouter = createTRPCRouter({
   roads: driverRouter2,
-  drivers: driverRouter,
+
   depots: depotRouter,
-  jobs: jobRouter,
+  job: jobRouter,
   routePlan: routePlanRouter,
   routeMessaging: solidarityPathwaysMessagingRouter,
 
   clients: clientRouter,
+
+  driver: driverRouter,
+  vehicle: vehicleRouter,
+  customer: clientRouterAlt,
 });
 
 // export type definition of API

@@ -1,28 +1,64 @@
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { useClient } from "~/providers/client";
 import { Lightbulb } from "lucide-react";
 
 import type { ClientJobBundle } from "../../types.wip";
+import { api } from "~/trpc/react";
+import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { StopCard } from "~/components/stops-section/stop-card";
+import { DataCard } from "~/app/_components/data-card";
 
 import { clientJobUploadOptions } from "../../data/stop-data";
-import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
 import { FileUploadModal } from "../shared/file-upload-modal.wip";
 import { CommandSearchJobs } from "./command-search-jobs";
 import StopOptionBtn from "./stop-option-btn.wip";
 
 export const StopsTab = () => {
-  const jobs = useClientJobBundles();
+  const router = useRouter();
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["jobs", "routePlan"],
+  });
+  const { depotId, routeId, routeDate } = useSolidarityState();
+
+  const getRouteJobs = api.routePlan.getJobBundles.useQuery(
+    { routeId },
+    { enabled: !!routeId },
+  );
+
+  const createJobBundles = api.job.createMany.useMutation({
+    ...defaultActions,
+    onSuccess: ({ route, message }) => {
+      defaultActions.onSuccess({ message });
+      if (!!route && route !== routeId)
+        router.push(`/${depotId}/route/${route}?mode=plan`);
+    },
+  });
 
   const fileUploadOptions = useMemo(
     () =>
       clientJobUploadOptions({
-        jobs: jobs.data,
-        setJobs: jobs.createMany,
+        jobs: getRouteJobs.data ?? [],
+        setJobs: ({ jobs: newJobs }) => {
+          const doesRouteExist =
+            routeId !== undefined
+              ? { routeId }
+              : { date: routeDate ?? new Date() };
+
+          createJobBundles.mutate({
+            bundles: newJobs ?? [],
+            depotId,
+            ...doesRouteExist,
+          });
+        },
       }),
-    [jobs],
+    [getRouteJobs.data],
   );
+
+  const { addPreviousJob, createNewJob } = useClient();
 
   return (
     <>
@@ -31,14 +67,14 @@ export const StopsTab = () => {
           <h2 className="flex scroll-m-20 gap-3 text-xl font-semibold tracking-tight">
             Stops{" "}
             <span className="rounded-lg border border-slate-300 px-2 text-base">
-              {jobs.data?.length ?? 0}
+              {getRouteJobs.data?.length ?? 0}
             </span>
           </h2>
 
-          {jobs.data?.length !== 0 && <StopOptionBtn />}
+          {getRouteJobs.data?.length !== 0 && <StopOptionBtn />}
         </div>
         <CommandSearchJobs />
-        {jobs.data?.length === 0 && (
+        {getRouteJobs.data?.length === 0 && (
           <>
             <p className="text-sm text-muted-foreground">
               No stops have been added to this route yet.
@@ -52,7 +88,7 @@ export const StopsTab = () => {
               <Button
                 variant={"outline"}
                 size={"lg"}
-                onClick={() => jobs.addPrevious()}
+                onClick={() => addPreviousJob()}
               >
                 Add previous stops & clients
               </Button>
@@ -60,7 +96,7 @@ export const StopsTab = () => {
               <Button
                 variant={"outline"}
                 size={"lg"}
-                onClick={() => jobs.createNew()}
+                onClick={() => createNewJob()}
               >
                 Manually add new stop
               </Button>
@@ -76,13 +112,15 @@ export const StopsTab = () => {
       </div>
 
       <ScrollArea className="flex-1 px-4">
-        {jobs.data?.length > 0 &&
-          jobs.data.map((listing, idx) => (
-            <StopCard
+        {!!getRouteJobs.data &&
+          getRouteJobs.data?.length > 0 &&
+          getRouteJobs.data?.map((listing, idx) => (
+            <DataCard
               key={idx}
               id={listing.job.id}
               name={listing?.client?.name ?? `Job # ${listing.job.id}`}
-              address={listing.job.address.formatted}
+              subtitle={listing.job.address.formatted}
+              type="job"
             />
           ))}
       </ScrollArea>

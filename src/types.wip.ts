@@ -1,10 +1,11 @@
+import * as z from "zod";
+
+import type { Prisma } from "@prisma/client";
 import {
   DriverType as DBDriverType,
   JobType as DBJobType,
-  type Prisma,
 } from "@prisma/client";
 
-import * as z from "zod";
 import type { driverFormSchema } from "./schemas.wip";
 
 export type VersionOneDriverCSV = {
@@ -163,8 +164,8 @@ export const vehicleSchema = z.object({
   maxDistance: z.number().optional(),
   shiftStart: z.number(),
   shiftEnd: z.number(),
-  notes: z.string().optional(),
-  cargo: z.string().optional(),
+  notes: z.string().optional().default(""),
+  cargo: z.string().optional().default(""),
   breaks: z
     .array(
       z.object({
@@ -182,6 +183,10 @@ export const driverVehicleSchema = z.object({
   vehicle: vehicleSchema,
 });
 
+export const newDriverVehicleSchema = z.object({
+  driver: driverSchema.omit({ id: true }),
+  vehicle: vehicleSchema.omit({ id: true }),
+});
 // actual RoadPoint
 export const roadPointSchema = z.object({
   id: z.string(),

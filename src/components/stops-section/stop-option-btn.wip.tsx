@@ -1,9 +1,14 @@
+"use client";
+
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { clientJobUploadOptions } from "~/data/stop-data";
 import { ChevronDownIcon, FilePlus2 } from "lucide-react";
 
 import type { ClientJobBundle } from "~/lib/validators/client-job";
-import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
+import { api } from "~/trpc/react";
+import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -13,21 +18,49 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Separator } from "~/components/ui/separator";
+import { JobClientSheetBtn } from "~/app/[depotId]/_components/client/job-client-sheet-btn";
 
 import { FileUploadModal } from "../shared/file-upload-modal.wip";
-import { JobClientSheetBtn } from "../sheet-job/job-client-sheet-btn";
 
 const StopOptionBtn = () => {
+  const router = useRouter();
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["jobs", "routePlan"],
+  });
+  const { depotId, routeId, routeDate } = useSolidarityState();
   const [isOpen, setIsOpen] = useState(false);
-  const jobs = useClientJobBundles();
+  const getRouteJobs = api.routePlan.getJobBundles.useQuery(
+    { routeId },
+    { enabled: !!routeId },
+  );
+
+  const createJobBundles = api.job.createMany.useMutation({
+    ...defaultActions,
+    onSuccess: ({ route, message }) => {
+      defaultActions.onSuccess({ message });
+      if (!!route && route !== routeId)
+        router.push(`/${depotId}/route/${route}?mode=plan`);
+    },
+  });
 
   const fileUploadOptions = useMemo(
     () =>
       clientJobUploadOptions({
-        jobs: jobs.data,
-        setJobs: jobs.createMany,
+        jobs: getRouteJobs?.data ?? [],
+        setJobs: ({ jobs: newJobs }) => {
+          const doesRouteExist =
+            routeId !== undefined
+              ? { routeId }
+              : { date: routeDate ?? new Date() };
+
+          createJobBundles.mutate({
+            bundles: newJobs ?? [],
+            depotId,
+            ...doesRouteExist,
+          });
+        },
       }),
-    [jobs],
+    [getRouteJobs?.data],
   );
 
   const closeSheetFirst = () => {

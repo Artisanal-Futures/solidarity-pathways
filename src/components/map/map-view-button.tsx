@@ -5,6 +5,9 @@ import { useEffect, useState } from "react";
 import "~/styles/geosearch.css";
 import "~/styles/leaflet.css";
 
+import { useClient } from "~/providers/client";
+import { useDriver } from "~/providers/driver";
+
 import { cn } from "~/lib/utils";
 import useMap from "~/hooks/use-map";
 import { Button } from "~/components/ui/button";
@@ -23,13 +26,16 @@ export type MapPoint = {
 
 export const MapViewButton = ({ mapRef }: { mapRef: LeafletMap }) => {
   const [enableTracking] = useState(true); // was false; browser will ask
-
+  const { activeDriverData } = useDriver();
+  const { activeJobData } = useClient();
   const [isSimulating, setIsSimulating] = useState(false);
 
   const params = {
     mapRef,
     trackingEnabled: true,
     constantUserTracking: enableTracking,
+    activeDriverData,
+    activeJobData,
   };
 
   const {

@@ -1,6 +1,7 @@
 import geocodingService from "~/services/autocomplete";
+
+import type { ClientJobBundle } from "~/lib/validators/client-job";
 import type {
-  ClientJobBundle,
   FileUploadFetch,
   FileUploadHandler,
   VersionOneClientCSV,

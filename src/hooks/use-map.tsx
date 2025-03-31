@@ -2,15 +2,15 @@ import type { LatLngExpression, Map } from "leaflet";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatGeometryString } from "~/services/optimization/aws-vroom/utils";
 import { useMapStore } from "~/stores/use-map-store";
-import { getCurrentLocation } from "~/utils/get-current-location";
 import axios from "axios";
 import L from "leaflet";
 
 import type { Coordinates } from "~/types";
+import { getCurrentLocation } from "~/utils/get-current-location";
+import { ClientJobBundle } from "~/lib/validators/client-job";
+import { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
 import { api } from "~/trpc/react";
 
-import { useDriverVehicleBundles } from "./drivers/use-driver-vehicle-bundles";
-import { useClientJobBundles } from "./jobs/use-client-job-bundles";
 import { useOptimizedRoutePlan } from "./optimized-data/use-optimized-route-plan";
 import { useSolidarityState } from "./optimized-data/use-solidarity-state";
 
@@ -24,10 +24,14 @@ type TUseMapProps = {
   trackingEnabled?: boolean;
   driverEnabled?: boolean;
   constantUserTracking?: boolean;
+  activeDriverData?: DriverVehicleBundle | null;
+  activeJobData?: ClientJobBundle | null;
 };
 
 const useMap = ({
   mapRef,
+  activeDriverData,
+  activeJobData,
   driverEnabled = true, //false, // was false
   constantUserTracking = true, //false, // was false
 }: TUseMapProps) => {
@@ -36,6 +40,12 @@ const useMap = ({
   //const [flyToDriver, setFlyToDriver] = useState(true);
   //const [constantTracking, setConstantTracking] = useState(true);
   const [isSimulatingGPS, setIsSimulatingGPS] = useState(false);
+
+  const { pathId, routeId } = useSolidarityState();
+  const getRouteJobs = api.routePlan.getJobBundles.useQuery(
+    { routeId },
+    { enabled: !!routeId },
+  );
 
   const {
     flyToDriver,
@@ -46,10 +56,7 @@ const useMap = ({
     setLocationMessage,
   } = useMapStore();
 
-  const { active: activeDriver } = useDriverVehicleBundles();
-  const jobs = useClientJobBundles();
-
-  const { pathId, routeId } = useSolidarityState();
+  // const { active: activeJob } = useClientJobBundles();
 
   const getRouteVehicles = api.routePlan.getVehicleBundles.useQuery(
     { routeId: routeId },
@@ -157,6 +164,7 @@ const useMap = ({
 
         if (flyToDriver && useThisLatitude && currentLocation?.latitude) {
           // locationMessage.error seems to be lagged
+
           const currentZoom = mapRef.getZoom();
           flyToCurrentLocation(currentZoom);
 
@@ -230,7 +238,7 @@ const useMap = ({
 
   const expandViewToFit = useCallback(() => {
     if (
-      ((jobs.data && jobs.data.length > 0) ||
+      ((getRouteJobs?.data && getRouteJobs?.data.length > 0) ||
         (!!getRouteVehicles.data && getRouteVehicles.data.length > 0)) &&
       mapRef
     ) {
@@ -245,7 +253,7 @@ const useMap = ({
           );
       const locationBounds = pathId
         ? optimizedRoutePlan.mapCoordinates.jobs
-        : jobs.data.map(
+        : getRouteJobs?.data?.map(
             (location) =>
               [
                 location.job.address.latitude,
@@ -256,22 +264,35 @@ const useMap = ({
 
       mapRef.fitBounds(bounds);
     }
-  }, [mapRef, getRouteVehicles?.data, jobs, optimizedRoutePlan, pathId]);
+  }, [
+    mapRef,
+    getRouteVehicles?.data,
+    getRouteJobs?.data,
+    optimizedRoutePlan,
+    pathId,
+  ]);
 
   useEffect(() => {
-    if (activeDriver && mapRef) flyTo(activeDriver.vehicle.startAddress, 15);
-  }, [activeDriver, mapRef, flyTo]);
+    if (activeDriverData && mapRef)
+      flyTo(activeDriverData.vehicle.startAddress, 15);
+  }, [activeDriverData, mapRef, flyTo]);
 
   useEffect(() => {
-    if (jobs.active && mapRef) flyTo(jobs.active.job.address, 15);
-  }, [jobs.active, mapRef, flyTo]);
+    if (activeJobData && mapRef) flyTo(activeJobData.job.address, 15);
+  }, [activeJobData, mapRef, flyTo]);
 
   useEffect(() => {
-    if (initial && mapRef && getRouteVehicles?.data && jobs.data) {
+    if (initial && mapRef && getRouteVehicles?.data && getRouteJobs?.data) {
       expandViewToFit();
       setInitial(false);
     }
-  }, [expandViewToFit, mapRef, getRouteVehicles?.data, jobs.data, initial]);
+  }, [
+    expandViewToFit,
+    mapRef,
+    getRouteVehicles?.data,
+    getRouteJobs?.data,
+    initial,
+  ]);
 
   const [hasPriorSuccess, setHasPriorSuccess] = useState(false);
 

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useDriver } from "~/providers/driver";
 import { getColor } from "~/utils/generic/color-handling";
 import { cuidToIndex } from "~/utils/generic/format-utils.wip";
 import { generateDriverPassCode } from "~/utils/server/auth-driver-passcode";
@@ -30,8 +31,9 @@ type Props = {
 export const AssignedJobSheet = ({ data }: Props) => {
   const [open, setOpen] = useState(false);
   const { currentDepot } = useDepot();
-  const { setActive: setActiveDriver } = useDriverVehicleBundles();
+
   const { depotId, routeId } = useSolidarityState();
+  const { setActiveDriverId } = useDriver();
 
   const getVehicleById = api.routePlan.getVehicleById.useQuery(
     { routeId: routeId, vehicleId: data?.vehicleId ?? "" },
@@ -53,8 +55,8 @@ export const AssignedJobSheet = ({ data }: Props) => {
   const driver = getVehicleById?.data;
 
   const onRouteSheetOpenChange = (state: boolean) => {
-    if (!state) void setActiveDriver(null);
-    else void setActiveDriver(data.vehicleId);
+    if (!state) void setActiveDriverId(null);
+    else void setActiveDriverId(data.vehicleId);
     setOpen(state);
   };
 

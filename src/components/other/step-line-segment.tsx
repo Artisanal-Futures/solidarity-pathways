@@ -1,9 +1,21 @@
+import { useClient } from "~/providers/client";
 import { CheckCircle, Coffee, Home, XCircle } from "lucide-react";
 
-import { cn } from "~/lib/utils";
-import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
 import type { OptimizedStop } from "../../types.wip";
+import { cn } from "~/lib/utils";
+import { api } from "~/trpc/react";
+import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
+
 import { unixSecondsToStandardTime } from "../../utils/generic/format-utils.wip";
+
+type Props = {
+  step: OptimizedStop;
+  idx?: number;
+  color?: string;
+  shiftStartAddress?: string;
+  shiftEndAddress?: string;
+  handleOnClick?: (data: unknown) => void;
+};
 
 const StepLineSegment = ({
   step,
@@ -11,18 +23,12 @@ const StepLineSegment = ({
   color,
   shiftStartAddress,
   shiftEndAddress,
-}: {
-  step: OptimizedStop;
-  idx?: number;
-  color?: string;
-  shiftStartAddress?: string;
-  shiftEndAddress?: string;
-  handleOnClick?: (data: unknown) => void;
-}) => {
+}: Props) => {
   const time = step?.arrival ?? "00:00";
 
-  const jobBundles = useClientJobBundles();
-  const job = step?.jobId ? jobBundles.getJobById(step?.jobId) : null;
+  const { findJobById } = useClient();
+
+  const job = findJobById(step?.jobId ?? "");
 
   const segmentType = {
     job: {

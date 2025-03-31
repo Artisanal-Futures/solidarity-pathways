@@ -21,25 +21,30 @@ import {
 import "~/styles/geosearch.css";
 import "~/styles/leaflet.css";
 
+import { driverVehicleDataForNewLatLng } from "~/data/driver-data";
 import { MAP_DATA } from "~/data/map-data";
+import { clientJobDataForNewLatLng } from "~/data/stop-data";
+import { useClient } from "~/providers/client";
+import { useDriver } from "~/providers/driver";
 import { formatGeometryString } from "~/services/optimization/aws-vroom/utils";
-import { getStyle } from "~/utils/generic/color-handling";
-import { cuidToIndex } from "~/utils/generic/format-utils.wip";
+import { useStopsStore } from "~/stores/use-stops-store";
 
 import type { GeoJsonData } from "~/types";
 import type { MapPoint } from "~/types/map";
+import { Coordinates } from "~/types/geolocation";
+import { getStyle } from "~/utils/generic/color-handling";
+import { cuidToIndex } from "~/utils/generic/format-utils.wip";
 import { pusherClient } from "~/lib/soketi/client";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { useDepot } from "~/hooks/depot/use-depot";
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
-import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
-import { useStopsStore } from "~/hooks/jobs/use-stops-store";
 import { useOptimizedRoutePlan } from "~/hooks/optimized-data/use-optimized-route-plan";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { useRoutePlans } from "~/hooks/plans/use-route-plans";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import useMap from "~/hooks/use-map";
 import { useMediaQuery } from "~/hooks/use-media-query";
+import { useSolidarityMessaging } from "~/hooks/use-solidarity-messaging";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -67,18 +72,31 @@ type CoordMap = Record<string, { lat: number; lng: number }>;
 const isDriverFromURL = window.location.href.includes("driverId");
 
 const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
-  const { pathId, routeId } = useSolidarityState();
+  const { pathId, routeId, depotId } = useSolidarityState();
 
   const mapRef = useRef<LeafletMap>(null);
 
   const [enableTracking, setEnableTracking] = useState(false);
 
   const { setSelectedJobIds, selectedJobIds } = useStopsStore.getState();
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["driver", "routePlan"],
+  });
+
+  const { activeDriverData } = useDriver();
+  const { activeJobData } = useClient();
+
+  const getRouteJobs = api.routePlan.getJobBundles.useQuery(
+    { routeId },
+    { enabled: !!routeId },
+  );
 
   const params = {
     mapRef: mapRef.current!,
     trackingEnabled: true,
     constantUserTracking: enableTracking,
+    activeDriverData,
+    activeJobData,
   };
 
   const { currentLocation } = useMap(params);
@@ -86,11 +104,13 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
 
   const [activeDrivers, setActiveDrivers] = useState<CoordMap>({});
 
-  const { createNewDriverByLatLng } = useDriverVehicleBundles();
+  const { createDriverChannels } = useSolidarityMessaging();
 
   const getVehicleById = api.routePlan.getVehicleByIdControlled.useMutation();
 
-  const jobBundles = useClientJobBundles();
+  const createVehicleBundles =
+    api.driver.createMany.useMutation(defaultActions);
+
   const routePlans = useRoutePlans();
 
   const getRouteVehicles = api.routePlan.getVehicleBundles.useQuery(
@@ -98,9 +118,34 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
     { enabled: !!routeId },
   );
 
-  // const drivers = bundles?.all;
-  const addDriverByLatLng = createNewDriverByLatLng;
-  const addJobByLatLng = jobBundles.createByLatLng;
+  const addDriverByLatLng = async ({ latitude, longitude }: Coordinates) => {
+    const driver = driverVehicleDataForNewLatLng(latitude, longitude);
+    const { data } = await createVehicleBundles.mutateAsync({
+      data: [driver],
+      depotId,
+      routeId: routeId,
+    });
+
+    const driverIds = data.map((driver) => driver.driver.id);
+
+    createDriverChannels.mutate({
+      depotId: depotId,
+      bundles: driverIds,
+    });
+  };
+
+  const createJobBundles = api.job.createMany.useMutation(defaultActions);
+  const addJobByLatLng = ({ latitude, longitude }: Coordinates) => {
+    const job = clientJobDataForNewLatLng(latitude, longitude);
+
+    createJobBundles.mutate({
+      bundles: [
+        { job: job.job, client: job.client?.email ? job.client : undefined },
+      ],
+      depotId: depotId,
+      routeId: routeId,
+    });
+  };
 
   const optimizedRoutePlan = useOptimizedRoutePlan();
 
@@ -116,7 +161,7 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
   const stopMapPoints: MapPoint[] = useMemo(() => {
     return pathId
       ? optimizedRoutePlan.mapData.jobs
-      : jobBundles.data.map((stop) => ({
+      : getRouteJobs.data?.map((stop) => ({
           id: stop.job.id,
           type: "job",
           lat: stop.job.address.latitude,
@@ -127,7 +172,7 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
             ? "-1"
             : `${cuidToIndex(routePlans.findVehicleIdByJobId(stop.job.id))}`,
         }));
-  }, [jobBundles.data, optimizedRoutePlan.mapData.jobs, pathId, routePlans]);
+  }, [getRouteJobs?.data, optimizedRoutePlan.mapData.jobs, pathId, routePlans]);
 
   const driverMapPoints: MapPoint[] = pathId
     ? optimizedRoutePlan.mapData.driver
@@ -575,7 +620,14 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
 
         {latLng && (
           <ContextMenuContent className="z-50 flex justify-center">
-            <ContextMenuItem onClick={() => addJobByLatLng({ ...latLng })}>
+            <ContextMenuItem
+              onClick={() =>
+                addJobByLatLng({
+                  latitude: latLng.lat,
+                  longitude: latLng.lng,
+                })
+              }
+            >
               <div className="flex flex-col items-center justify-center">
                 <div>Add Client here</div>
                 <div className="text-sm text-gray-500">
@@ -584,7 +636,14 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
               </div>
             </ContextMenuItem>
 
-            <ContextMenuItem onClick={() => addDriverByLatLng({ ...latLng })}>
+            <ContextMenuItem
+              onClick={() =>
+                addDriverByLatLng({
+                  latitude: latLng.lat,
+                  longitude: latLng.lng,
+                })
+              }
+            >
               <div className="flex flex-col items-center justify-center">
                 <div>Add Driver here</div>
                 <div className="text-sm text-gray-500">

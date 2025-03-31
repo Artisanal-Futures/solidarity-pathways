@@ -1,7 +1,7 @@
+import { useClient } from "~/providers/client";
 import { Pencil } from "lucide-react";
 
 import { cn } from "~/lib/utils";
-import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
 import { Card, CardHeader, CardTitle } from "~/components/ui/card";
 
 type Props = {
@@ -9,8 +9,8 @@ type Props = {
   jobId: string;
 };
 export const UnassignedJobCard = ({ address, jobId }: Props) => {
-  const { edit } = useClientJobBundles();
-  const editUnassigned = () => edit(jobId);
+  const { openJobEdit } = useClient();
+  const editUnassigned = () => openJobEdit(jobId);
 
   return (
     <Card

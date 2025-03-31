@@ -6,7 +6,7 @@ import { AbsolutePageLoader } from "~/components/absolute-page-loader";
 import { AddNewDataPopover } from "~/components/layout/add-new-data-popover";
 import RouteLayout from "~/components/layout/route-layout";
 
-import { DriverVehicleSheet } from "../../_components/sheet-driver/driver-vehicle-sheet";
+import { DriverVehicleSheet } from "../../_components/driver/driver-vehicle-sheet";
 import { HomePageOnboardingCard } from "./homepage-onboarding-card.wip";
 import { HomePageOverviewCard } from "./homepage-overview-card.wip";
 import { RouteCalendar } from "./route-calendar.wip";

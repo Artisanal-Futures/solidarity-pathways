@@ -1,20 +1,20 @@
 import { useMemo } from "react";
+import { useClient } from "~/providers/client";
 
-import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
 import { DepotCard } from "~/components/shared/depot-card";
 
 type Props = { id: string; name: string; address: string };
 
 export const StopCard = ({ id, name, address }: Props) => {
-  const { edit, isActive } = useClientJobBundles();
+  const { openJobEdit, isJobActive } = useClient();
 
-  const onJobEdit = () => edit(id);
+  const onJobEdit = () => openJobEdit(id);
 
-  const isJobActive = useMemo(() => isActive(id), [isActive, id]);
+  const isActive = useMemo(() => isJobActive(id), [isJobActive, id]);
 
   return (
     <DepotCard
-      isActive={isJobActive}
+      isActive={isActive}
       title={name ?? "New Stop"}
       subtitle={address}
       onEdit={onJobEdit}

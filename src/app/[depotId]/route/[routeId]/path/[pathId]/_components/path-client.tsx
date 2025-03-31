@@ -10,7 +10,6 @@ import { Beforeunload } from "react-beforeunload";
 
 import type { OptimizedStop } from "~/types.wip";
 import { api } from "~/trpc/react";
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
 import { useOptimizedRoutePlan } from "~/hooks/optimized-data/use-optimized-route-plan";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { DriverVerificationDialog } from "~/components/driver-verification-dialog.wip";
@@ -38,12 +37,12 @@ export const OptimizedPathClient = ({ verifiedDriver }: Props) => {
 
   const optimizedRoutePlan = useOptimizedRoutePlan();
 
-  const getVehicleById = api.routePlan.getVehicleById.useQuery(
-    { routeId, vehicleId: optimizedRoutePlan?.data?.vehicleId ?? "" },
-    { enabled: !!optimizedRoutePlan?.data?.vehicleId && !!routeId },
-  );
+  const getVehicleById = api.routePlan.getVehicleByIdControlled.useMutation();
 
-  const driver = getVehicleById?.data;
+  const driver = getVehicleById.mutateAsync({
+    routeId,
+    vehicleId: optimizedRoutePlan?.data?.vehicleId ?? "",
+  });
 
   const routeColor = getColor(
     cuidToIndex(optimizedRoutePlan?.data?.vehicleId ?? ""),
@@ -89,7 +88,7 @@ export const OptimizedPathClient = ({ verifiedDriver }: Props) => {
 
                       <RouteBreakdown
                         steps={optimizedRoutePlan.data.stops as OptimizedStop[]}
-                        driver={driver}
+                        driver={void driver}
                         color={routeColor.background}
                       />
                     </>

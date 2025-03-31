@@ -1,5 +1,7 @@
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
-import { useDeleteJob } from "~/hooks/jobs/CRUD/use-delete-job";
+"use client";
+
+import { api } from "~/trpc/react";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 
 type Props = {
   name: string;
@@ -13,15 +15,18 @@ const driver = "DRIVER";
 const client = "CLIENT";
 
 export const MapPopup = ({ name, address, id, kind }: Props) => {
-  const { deleteJobFromRoute } = useDeleteJob();
-  const { deleteVehicleMutation } = useDriverVehicleBundles(); // Use the hook to get the deletion function
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["driver", "job", "routePlan"],
+  });
 
-  const handleDelete = () => {
+  const deleteOnlyFromRoute = api.job.delete.useMutation(defaultActions);
+
+  const deleteVehicleMutation = api.vehicle.delete.useMutation(defaultActions);
+
+  const handleDelete = async () => {
     console.log("trying to delete ", kind, id, name, address);
 
-    if (kind == client) {
-      deleteJobFromRoute({ id });
-    }
+    if (kind == client) await deleteOnlyFromRoute.mutateAsync(id);
 
     if (kind == driver && !!id) {
       deleteVehicleMutation.mutate(id);

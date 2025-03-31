@@ -11,7 +11,6 @@ import optimizationService from "../../services/optimization";
 import { generatePassCode } from "../../utils/generic/generate-passcode";
 import { getUniqueKey } from "../../utils/generic/unique-key";
 import { useDepot } from "../depot/use-depot";
-import { useClientJobBundles } from "../jobs/use-client-job-bundles";
 import { useSolidarityState } from "../optimized-data/use-solidarity-state";
 import { useRoutingSolutions } from "./use-routing-solutions";
 
@@ -27,8 +26,6 @@ export const useRoutePlans = () => {
     { routeId: routeId },
     { enabled: !!routeId },
   );
-
-  const jobBundles = useClientJobBundles();
 
   const routingSolutions = useRoutingSolutions();
   const { currentDepot } = useDepot();
@@ -51,6 +48,11 @@ export const useRoutePlans = () => {
     { enabled: false },
   );
 
+  const getRouteJobs = api.routePlan.getJobBundles.useQuery(
+    { routeId },
+    { enabled: !!routeId },
+  );
+
   const createRoutePlan = api.routePlan.createRoutePlan.useMutation({
     onSuccess: (data) => {
       toastService.success("Route created!");
@@ -70,11 +72,11 @@ export const useRoutePlans = () => {
 
   const route = getRoutePlanById?.data;
 
-  const unassignedJobs = jobBundles.data?.filter(
+  const unassignedJobs = getRouteJobs?.data?.filter(
     (bundle) => !bundle.job.isOptimized,
   );
 
-  const assignedJobs = jobBundles.data?.filter(
+  const assignedJobs = getRouteJobs?.data?.filter(
     (bundle) => bundle.job.isOptimized,
   );
 
@@ -94,7 +96,9 @@ export const useRoutePlans = () => {
   });
 
   const calculateRoutes = async (selectedJobIds?: string[]) => {
-    const jobs_bundles = optimizationService.formatClientData(jobBundles.data);
+    const jobs_bundles = optimizationService.formatClientData(
+      getRouteJobs?.data ?? [],
+    );
     const vehicles = optimizationService.formatDriverData(
       getRouteVehicles?.data ?? [],
     );
@@ -129,8 +133,8 @@ export const useRoutePlans = () => {
       });
     } else {
       const uniqueKey = await getUniqueKey({
-        locations: jobBundles.data,
-        drivers: getRouteVehicles?.data,
+        locations: getRouteJobs?.data ?? [],
+        drivers: getRouteVehicles?.data ?? [],
       });
 
       routingSolutions.setRoutingSolutions(uniqueKey, results);
@@ -193,7 +197,7 @@ export const useRoutePlans = () => {
     optimized: getRoutePlanById.data?.optimizedRoute ?? [],
     assigned: assignedJobs,
     unassigned: unassignedJobs,
-    unassignedIds: unassignedJobs.map((job) => job.job.id),
+    unassignedIds: unassignedJobs?.map((job) => job.job.id),
     calculate: calculateRoutes,
     bundles: jobVehicleBundles,
     findVehicleIdByJobId,

@@ -1,11 +1,8 @@
+import { jobTypeSchema } from "~/types.wip";
 import { uniqueId } from "lodash";
 
-import {
-  jobTypeSchema,
-  type ClientJobBundle,
-  type StopFormValues,
-  type VersionOneClientCSV,
-} from "~/types.wip";
+import type { ClientJobBundle } from "~/lib/validators/client-job";
+import type { StopFormValues, VersionOneClientCSV } from "~/types.wip";
 import {
   militaryTimeToUnixSeconds,
   minutesToSeconds,

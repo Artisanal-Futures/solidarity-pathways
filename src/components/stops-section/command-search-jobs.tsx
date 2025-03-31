@@ -2,6 +2,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useClient } from "~/providers/client";
 import { CommandLoading } from "cmdk";
 import _debounce from "lodash/debounce";
 import { Check, Info, Loader2 } from "lucide-react";
@@ -11,10 +12,8 @@ import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
 
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
-import { useCreateJob } from "~/hooks/jobs/CRUD/use-create-job";
-import { useDeleteJob } from "~/hooks/jobs/CRUD/use-delete-job";
-import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import { Button } from "~/components/ui/button";
 import {
   CommandEmpty,
@@ -41,31 +40,36 @@ type SearchJob = Prisma.JobGetPayload<{
 
 export function CommandSearchJobs() {
   const [open, setOpen] = useState(false);
-  const jobs = useClientJobBundles();
-  const { duplicateJobIdsToRoute } = useCreateJob();
-  const { deleteJobsFromRoute } = useDeleteJob();
+  const { openJobEdit } = useClient();
+
   const [value, setValue] = useState("");
   const apiContext = api.useUtils();
   const [selectedJobs, setSelectedJobs] = useState<SearchJob[]>([]);
   const { routeId, depotId } = useSolidarityState();
 
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["job", "customer", "routePlan"],
+  });
+
+  const duplicateJobsToRoute =
+    api.job.duplicateToRoute.useMutation(defaultActions);
+
+  const deleteOnlyFromRoute = api.job.deleteMany.useMutation(defaultActions);
+
   const listRef = useRef(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const getAllJobs = api.jobs.searchForJobs.useQuery(
+  const getAllJobs = api.job.search.useQuery(
     { depotId: depotId, queryString: value },
     { enabled: false },
   );
 
-  const handleDebounceFn = () => {
-    void getAllJobs.refetch();
-  };
+  const handleDebounceFn = () => void getAllJobs.refetch();
 
   const debounceFn = useCallback(_debounce(handleDebounceFn, 1000), []);
 
   const handleChange = (data: string) => {
     setValue(data);
-
     debounceFn();
   };
 
@@ -93,27 +97,29 @@ export function CommandSearchJobs() {
 
   const handleOnCommandDialogOpen = (state: boolean) => {
     if (!state) {
-      void apiContext.jobs.invalidate();
+      void apiContext.job.invalidate();
       setValue("");
       setSelectedJobs([]);
     }
     setOpen(state);
   };
 
-  const handleOnDuplicateJobs = () => {
-    duplicateJobIdsToRoute({
-      jobs: selectedJobs.map((job) => job.id),
-    });
+  const handleOnDuplicateJobs = async () => {
+    if (!!routeId)
+      await duplicateJobsToRoute.mutateAsync({
+        bundleIds: selectedJobs.map((job) => job.id),
+        depotId,
+        routeId,
+      });
 
-    void apiContext.jobs.invalidate();
     setValue("");
     setSelectedJobs([]);
   };
-  const handleOnDeleteJobs = () => {
-    deleteJobsFromRoute({
-      jobs: selectedJobs.map((job) => job.id),
+  const handleOnDeleteJobs = async () => {
+    await deleteOnlyFromRoute.mutateAsync({
+      routeId,
+      jobIds: selectedJobs.map((job) => job.id),
     });
-    void apiContext.jobs.invalidate();
     setValue("");
     setSelectedJobs([]);
   };
@@ -207,7 +213,7 @@ export function CommandSearchJobs() {
                     variant={"outline"}
                     type="button"
                     onClick={() => {
-                      jobs.edit(job.id);
+                      openJobEdit(job.id);
                       setOpen(false);
                     }}
                   >
@@ -288,7 +294,7 @@ export function CommandSearchJobs() {
                     className="absolute right-8 z-50 max-h-8"
                     type="button"
                     onClick={() => {
-                      jobs.edit(job.id);
+                      openJobEdit(job.id);
                       setOpen(false);
                     }}
                   >

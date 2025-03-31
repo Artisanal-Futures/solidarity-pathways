@@ -1,5 +1,6 @@
 import type * as z from "zod";
 import { useCallback, useEffect, useRef } from "react";
+import { useDriver } from "~/providers/driver";
 import { Building, Send, User } from "lucide-react";
 import { useForm } from "react-hook-form";
 
@@ -34,7 +35,9 @@ type MessageFormValues = z.infer<typeof messageSchema>;
 
 export const MessageSheet = () => {
   const solidarityMessaging = useSolidarityMessaging();
-  const driverBundles = useDriverVehicleBundles();
+
+  const { activeDriverData } = useDriver();
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const solidarityNotifications = useSolidarityNotifications();
   const apiContext = api.useUtils();
@@ -109,7 +112,7 @@ export const MessageSheet = () => {
   }, [solidarityMessaging.isMessageSheetOpen]);
 
   const messageThreadName = solidarityMessaging.isDepot
-    ? `${driverBundles?.active?.driver?.name}`
+    ? `${activeDriverData?.driver?.name}`
     : "Depot";
 
   const channelName = solidarityMessaging.active?.name;

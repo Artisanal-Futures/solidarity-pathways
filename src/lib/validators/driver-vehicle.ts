@@ -61,4 +61,17 @@ export const driverVehicleSchema = z.object({
   vehicle: vehicleSchema,
 });
 
+export const newDriverVehicleSchema = z.object({
+  driver: driverSchema.omit({ id: true, addressId: true }),
+  vehicle: vehicleSchema.omit({
+    id: true,
+    type: true,
+    startAddressId: true,
+    endAddressId: true,
+  }),
+});
+
 export type DriverVehicleBundle = z.infer<typeof driverVehicleSchema>;
+export type NewDriverVehicleBundles = z.infer<typeof newDriverVehicleSchema>;
+export type Driver = z.infer<typeof driverSchema>;
+export type Vehicle = z.infer<typeof vehicleSchema>;

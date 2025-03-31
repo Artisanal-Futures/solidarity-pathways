@@ -8,18 +8,23 @@ import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
 import { api } from "~/trpc/react";
 import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import { Button } from "~/components/ui/button";
 import { FileUploadModal } from "~/components/shared/file-upload-modal.wip";
 
 export const ImportDriversButton = () => {
   const { depotId, routeId, depotMode } = useSolidarityState();
 
-  const { data: depotDrivers } = api.drivers.getDepotDrivers.useQuery(
-    { depotId },
-    { enabled: !!depotId && depotMode !== "calculate" },
-  );
+  const { data: depotDrivers } = api.driver.getAll.useQuery(depotId, {
+    enabled: !!depotId && depotMode !== "calculate",
+  });
 
-  const { createVehicleBundles } = useDriverVehicleBundles();
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["driver", "routePlan"],
+  });
+
+  const createVehicleBundles =
+    api.driver.createMany.useMutation(defaultActions);
 
   const fileUploadOptions = useMemo(() => {
     return driverVehicleUploadOptions({

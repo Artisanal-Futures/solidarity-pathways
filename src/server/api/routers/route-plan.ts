@@ -9,46 +9,22 @@ import type { ClientJobBundle, DriverVehicleBundle } from "~/types.wip";
 import { pusherServer } from "~/lib/soketi/server";
 
 export const routePlanRouter = createTRPCRouter({
-  setOptimizedData: protectedProcedure
-    .input(z.object({ data: z.string(), routeId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      return ctx.db.route.update({
-        where: {
-          id: input.routeId,
-        },
-        data: {
-          optimizedData: input.data,
-        },
-      });
-    }),
-
   clearOptimizedStopsFromRoute: protectedProcedure
     .input(z.object({ routeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const route = await ctx.db.route.update({
-        where: {
-          id: input.routeId,
-        },
-        data: {
-          optimizedRoute: {
-            deleteMany: {},
-          },
-          optimizedData: null,
-        },
+      await ctx.db.route.update({
+        where: { id: input.routeId },
+        data: { optimizedRoute: { deleteMany: {} }, optimizedData: null },
       });
 
-      // const jobs = await ctx.db.job.updateMany({
-      //   where: {
-      //     routeId: input.routeId,
-      //   },
-      //   data: {
-      //     isOptimized: false,
-      //   },
-      // });
+      await ctx.db.job.updateMany({
+        where: { routeId: input.routeId },
+        data: { isOptimized: false },
+      });
 
       return {
-        data: route,
-        message: "Optimized stops have been cleared",
+        data: "success",
+        message: "Optimized stops were successfully cleared.",
       };
     }),
 
@@ -61,14 +37,8 @@ export const routePlanRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       await ctx.db.route.update({
-        where: {
-          id: input.routeId,
-        },
-        data: {
-          optimizedRoute: {
-            deleteMany: {},
-          },
-        },
+        where: { id: input.routeId },
+        data: { optimizedRoute: { deleteMany: {} } },
       });
       const unassigned = input.plan.data.unassigned.map(
         (job) => job.description,
@@ -92,13 +62,9 @@ export const routePlanRouter = createTRPCRouter({
       await ctx.db.job.updateMany({
         where: {
           routeId: input.routeId,
-          id: {
-            notIn: unassigned,
-          },
+          id: { notIn: unassigned },
         },
-        data: {
-          isOptimized: true,
-        },
+        data: { isOptimized: true },
       });
 
       await Promise.all(
@@ -134,12 +100,8 @@ export const routePlanRouter = createTRPCRouter({
       );
 
       return ctx.db.route.update({
-        where: {
-          id: input.routeId,
-        },
-        data: {
-          optimizedData: JSON.stringify(input.plan.data),
-        },
+        where: { id: input.routeId },
+        data: { optimizedData: JSON.stringify(input.plan.data) },
       });
     }),
 
@@ -353,11 +315,7 @@ export const routePlanRouter = createTRPCRouter({
     }),
 
   getRoutePlanById: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-      }),
-    )
+    .input(z.object({ id: z.string() }))
     .query(({ ctx, input }) => {
       return ctx.db.route.findUnique({
         where: {

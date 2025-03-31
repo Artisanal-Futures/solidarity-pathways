@@ -7,8 +7,8 @@ import type { HomePageImportBtnProps } from "~/app/[depotId]/overview/_component
 import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
 import type { UploadOptions } from "~/types/misc";
 import { api } from "~/trpc/react";
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import { FileUploadModal } from "~/components/shared/file-upload-modal.wip";
 import { HomePageOverviewImportBtn } from "~/app/[depotId]/overview/_components/homepage-overview-import-btn";
 
@@ -20,17 +20,21 @@ type UploadButtonOptions<T> = {
 export const HomepageDriverImportCard = () => {
   const { depotId, routeId, depotMode } = useSolidarityState();
 
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["driver", "routePlan"],
+  });
+
   const { data: routeDrivers } = api.routePlan.getVehicleBundles.useQuery(
     { routeId },
     { enabled: !!routeId },
   );
 
-  const { data: depotDrivers } = api.drivers.getDepotDrivers.useQuery(
-    { depotId },
-    { enabled: !!depotId && depotMode !== "calculate" },
-  );
+  const { data: depotDrivers } = api.driver.getAll.useQuery(depotId, {
+    enabled: !!depotId && depotMode !== "calculate",
+  });
 
-  const { createVehicleBundles } = useDriverVehicleBundles();
+  const createVehicleBundles =
+    api.driver.createMany.useMutation(defaultActions);
 
   const driverImportButtonProps = {
     button: {

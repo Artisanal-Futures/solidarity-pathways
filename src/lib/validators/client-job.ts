@@ -44,4 +44,16 @@ export const clientJobSchema = z.object({
   job: jobSchema,
 });
 
+export const newClientJobSchema = z.object({
+  client: clientSchema
+    .omit({ id: true, addressId: true, defaultJobId: true })
+    .optional(),
+  job: jobSchema.omit({
+    id: true,
+    addressId: true,
+    isOptimized: true,
+    clientId: true,
+  }),
+});
+
 export type ClientJobBundle = z.infer<typeof clientJobSchema>;

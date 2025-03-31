@@ -1,6 +1,7 @@
 import { api } from "~/trpc/react";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { ScrollArea } from "~/components/ui/scroll-area";
+import { DataCard } from "~/app/_components/data-card";
 
 import { DriverCard } from "./driver-card";
 import { DriverVehicleSheetBtn } from "./driver-vehicle-sheet-btn";
@@ -39,10 +40,11 @@ export const DriversTab = () => {
         <ScrollArea className="px-4">
           {getRouteVehicles.data.length > 0 &&
             getRouteVehicles.data.map((bundle) => (
-              <DriverCard
+              <DataCard
                 key={bundle?.vehicle.id}
                 id={bundle?.vehicle.id}
                 name={bundle.driver?.name ?? "New Driver"}
+                type="vehicle"
               />
             ))}
         </ScrollArea>

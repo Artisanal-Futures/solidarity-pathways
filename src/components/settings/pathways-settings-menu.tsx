@@ -13,6 +13,7 @@ import { useDepot } from "~/hooks/depot/use-depot";
 import { useDepotModal } from "~/hooks/depot/use-depot-modal.wip";
 import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -31,22 +32,18 @@ import { DepotModal } from "./depot-modal";
 export const PathwaysSettingsMenu = ({ children }: { children: ReactNode }) => {
   const [open, setOpen] = useState(false);
 
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["driver", "job", "routePlan"],
+  });
+
   const router = useRouter();
   const { currentDepot, deleteDepot } = useDepot();
   const { depotId } = useSolidarityState();
   const apiContext = api.useUtils();
   const onOpen = useDepotModal((state) => state.onOpen);
 
-  const deleteClientsMutation = api.jobs.deleteAllDepotClients.useMutation({
-    onSuccess: ({ message }) => toastService.success(message),
-    onError: (error) => {
-      toastService.error({
-        message: "There seems to be an issue with deleting your clients.",
-        error,
-      });
-    },
-    onSettled: () => void apiContext.jobs.invalidate(),
-  });
+  const deleteClientsMutation =
+    api.customer.deleteAllFromDepot.useMutation(defaultActions);
 
   const deleteMessagingMutation = api.routeMessaging.nukeEverything.useMutation(
     {
@@ -66,7 +63,8 @@ export const PathwaysSettingsMenu = ({ children }: { children: ReactNode }) => {
     deleteDepot.mutate(depotId);
   };
 
-  const { purgeAllDriversMutation } = useDriverVehicleBundles();
+  const purgeAllDriversMutation =
+    api.driver.deleteAllFromDepot.useMutation(defaultActions);
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>

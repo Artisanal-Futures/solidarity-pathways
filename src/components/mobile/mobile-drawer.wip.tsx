@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useClient } from "~/providers/client";
 import { useMapStore } from "~/stores/use-map-store";
 import {
   ChevronLeftIcon,
@@ -17,9 +18,9 @@ import type { EditStopFormValues } from "~/lib/validators/route-plan";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react"; // ?
 
+import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { Button } from "~/components/ui/button";
 
-import { useClientJobBundles } from "../../hooks/jobs/use-client-job-bundles";
 import { useOptimizedRoutePlan } from "../../hooks/optimized-data/use-optimized-route-plan";
 
 export const MobileDrawer = () => {
@@ -53,18 +54,24 @@ export const MobileDrawer = () => {
         error,
       }),
     onSettled: () => {
-      jobBundles.onFieldJobSheetOpen(false);
+      onFieldJobSheetOpen(false);
       void apiContext.routePlan.invalidate();
     },
   });
 
   const { data: routePlan } = useOptimizedRoutePlan();
 
-  const jobBundles = useClientJobBundles();
+  const { onFieldJobSheetOpen } = useClient();
+  const { routeId } = useSolidarityState();
+
+  const getRouteJobs = api.routePlan.getJobBundles.useQuery(
+    { routeId },
+    { enabled: !!routeId },
+  );
 
   const jobsForRoute = routePlan?.stops
     .map((stop) => {
-      const jobBundle = jobBundles.data.find(
+      const jobBundle = getRouteJobs.data?.find(
         (jobBundle) => jobBundle.job.id === stop.jobId,
       );
       return jobBundle ? jobBundle.job : undefined;

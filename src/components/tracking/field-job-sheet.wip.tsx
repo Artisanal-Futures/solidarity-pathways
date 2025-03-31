@@ -1,9 +1,9 @@
 import * as React from "react";
+import { useClient } from "~/providers/client";
 
 import { DialogClose } from "@radix-ui/react-dialog";
 
 import { api } from "~/trpc/react";
-import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
 import { useOptimizedRoutePlan } from "~/hooks/optimized-data/use-optimized-route-plan";
 import { useMediaQuery } from "~/hooks/use-media-query";
 import { Badge } from "~/components/ui/badge";
@@ -28,14 +28,15 @@ import {
 import { CurrentStopForm } from "~/components/tracking/current-stop-form";
 
 export const FieldJobSheet = () => {
-  const jobBundles = useClientJobBundles();
+  const { activeJobData, isFieldJobSheetOpen, onFieldJobSheetOpen } =
+    useClient();
   const optimizedRoutePlan = useOptimizedRoutePlan();
 
   const currentStop = optimizedRoutePlan?.data?.stops.find(
-    (stop) => stop?.jobId === jobBundles.active?.job.id,
+    (stop) => stop?.jobId === activeJobData?.job.id,
   );
 
-  const currentJob = jobBundles.active?.job;
+  const currentJob = activeJobData?.job;
 
   const isDesktop = useMediaQuery("(min-width: 768px)");
 
@@ -50,10 +51,7 @@ export const FieldJobSheet = () => {
 
   if (isDesktop) {
     return (
-      <Dialog
-        open={jobBundles.isFieldJobSheetOpen}
-        onOpenChange={jobBundles.onFieldJobSheetOpen}
-      >
+      <Dialog open={isFieldJobSheetOpen} onOpenChange={onFieldJobSheetOpen}>
         <DialogContent className="lg sm:max-w-[620px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-4">
@@ -80,10 +78,7 @@ export const FieldJobSheet = () => {
   }
 
   return (
-    <Drawer
-      open={jobBundles.isFieldJobSheetOpen}
-      onOpenChange={jobBundles.onFieldJobSheetOpen}
-    >
+    <Drawer open={isFieldJobSheetOpen} onOpenChange={onFieldJobSheetOpen}>
       <DrawerContent>
         <div className="mx-auto w-full max-w-sm">
           <DrawerHeader className="text-left">

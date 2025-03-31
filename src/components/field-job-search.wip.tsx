@@ -1,8 +1,12 @@
-import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
-import { MapPin } from "lucide-react";
 import { useState } from "react";
-import { Button } from "~/components/ui/button";
+import { useClient } from "~/providers/client";
+import { MapPin } from "lucide-react";
 
+import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
+
+import { cn } from "~/lib/utils";
+import { useOptimizedRoutePlan } from "~/hooks/optimized-data/use-optimized-route-plan";
+import { Button } from "~/components/ui/button";
 import {
   CommandDialog,
   CommandEmpty,
@@ -12,15 +16,11 @@ import {
   CommandList,
 } from "~/components/ui/command";
 
-import { useClientJobBundles } from "~/hooks/jobs/use-client-job-bundles";
-import { useOptimizedRoutePlan } from "~/hooks/optimized-data/use-optimized-route-plan";
-import { cn } from "~/lib/utils";
-
 export function FieldJobSearch({ isIcon }: { isIcon: boolean }) {
   const [open, setOpen] = useState(false);
 
   const optimizedRoutePlan = useOptimizedRoutePlan();
-  const jobBundles = useClientJobBundles();
+  const { openViewJob } = useClient();
 
   return (
     <>
@@ -49,7 +49,7 @@ export function FieldJobSearch({ isIcon }: { isIcon: boolean }) {
                 <div
                   className="flex cursor-pointer items-center"
                   onClick={() => {
-                    jobBundles.view(job.job.id);
+                    openViewJob(job.job.id);
                     setOpen(false);
                   }}
                 >
