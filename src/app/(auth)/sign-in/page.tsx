@@ -90,7 +90,7 @@ import {
 import { Separator } from "~/components/ui/separator";
 
 export default async function SignInPage(props: {
-  searchParams: { callbackUrl: string | undefined; error?: string };
+  searchParams: Promise<{ callbackUrl: string | undefined; error?: string }>;
 }) {
   const providers = [
     {
@@ -107,6 +107,8 @@ export default async function SignInPage(props: {
     },
   ];
 
+  const searchParams = await props.searchParams;
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50">
       <Card className="w-full max-w-md shadow-lg">
@@ -115,11 +117,11 @@ export default async function SignInPage(props: {
           <CardDescription className="text-center">
             Sign in to your Artisanal Futures account
           </CardDescription>
-          {props.searchParams?.error && (
+          {searchParams?.error && (
             <div className="mt-2 rounded-md bg-red-50 p-2 text-sm text-red-600">
-              {props.searchParams.error === "CredentialsSignin"
+              {searchParams.error === "CredentialsSignin"
                 ? "Invalid credentials"
-                : `Error: ${props.searchParams.error}`}
+                : `Error: ${searchParams.error}`}
             </div>
           )}
         </CardHeader>
@@ -132,7 +134,7 @@ export default async function SignInPage(props: {
                   "use server";
                   try {
                     await signIn(provider.id, {
-                      redirectTo: props.searchParams?.callbackUrl ?? "/",
+                      redirectTo: searchParams?.callbackUrl ?? "/",
                     });
                   } catch (error) {
                     if (error instanceof AuthError) {
