@@ -1,7 +1,8 @@
-import NextAuth from "next-auth";
 import { cache } from "react";
+import NextAuth from "next-auth";
 
 import { env } from "~/env";
+
 import { authConfig } from "./config";
 
 const useSecureCookies = env.NEXTAUTH_URL.startsWith("https://");
@@ -27,18 +28,26 @@ const {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        domain: "." + hostName,
+        domain: hostName,
         secure: useSecureCookies,
       },
     },
-
+    callbackUrl: {
+      name: `${cookiePrefix}next-auth.callback-url`,
+      options: {
+        sameSite: "lax",
+        path: "/",
+        domain: hostName,
+        secure: useSecureCookies,
+      },
+    },
     csrfToken: {
       name: `${cookiePrefix}next-auth.csrf-token`,
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        domain: "." + hostName,
+        domain: hostName,
         secure: useSecureCookies,
       },
     },
