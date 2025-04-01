@@ -4,7 +4,9 @@ import { clientRouterAlt } from "./routers/client";
 import { clientRouter } from "./routers/clients";
 import { depotRouter } from "./routers/depot";
 import { driverRouter } from "./routers/driver";
+import { geocodeRouter } from "./routers/geocode";
 import { jobRouter } from "./routers/job";
+import { routeOptimizationRouter } from "./routers/route-optimization";
 import { routePlanRouter } from "./routers/route-plan";
 import { vehicleRouter } from "./routers/vehicle";
 
@@ -23,6 +25,9 @@ export const appRouter = createTRPCRouter({
   job: jobRouter,
   customer: clientRouterAlt,
   depot: depotRouter,
+  geocode: geocodeRouter,
+
+  routeOptimization: routeOptimizationRouter,
 });
 
 // export type definition of API

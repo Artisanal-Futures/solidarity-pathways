@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { NextResponse } from "next/server";
-import { emailService } from "~/services/email";
-import NewRouteTemplate from "~/services/email/email-templates/new-route-template";
+
+import { emailService } from "~/lib/email";
+import NewRouteTemplate from "~/lib/email/email-templates/new-route-template";
 
 export async function POST(request: Request) {
   try {

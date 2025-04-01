@@ -27,11 +27,11 @@ import "~/styles/leaflet.css";
 import { MAP_DATA } from "~/data/map-data";
 import { useClient } from "~/providers/client";
 import { useDriver } from "~/providers/driver";
-import { formatGeometryString } from "~/services/optimization/aws-vroom/utils";
 
 import type { Coordinates, GeoJsonData } from "~/types/geolocation";
 import { getStyle } from "~/utils/generic/color-handling";
 import { cuidToIndex } from "~/utils/generic/format-utils.wip";
+import { formatGeometryString } from "~/lib/optimization/vroom-optimization";
 import { pusherClient } from "~/lib/soketi/client";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";

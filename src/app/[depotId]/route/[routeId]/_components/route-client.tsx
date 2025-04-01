@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useClient } from "~/providers/client";
-import { notificationService } from "~/services/notification";
 import {
   ArrowRight,
+  Bug,
   Building,
   Calendar,
   Loader2,
@@ -100,6 +100,13 @@ export const RouteClient = () => {
     api.routePlan.clearOptimizedStops.useMutation(defaultActions);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [soketiStatus, setSoketiStatus] = useState<{
+    connected: boolean;
+    lastEvent?: string;
+    lastTimestamp?: string;
+  }>({
+    connected: false,
+  });
 
   const { updateUrlParams, getUrlParam } = useUrlParams();
 
@@ -114,32 +121,67 @@ export const RouteClient = () => {
   useEffect(() => {
     pusherClient.subscribe("map");
 
+    // Update connection status when Pusher connects
+    pusherClient.connection.bind("connected", () => {
+      setSoketiStatus((prev) => ({
+        ...prev,
+        connected: true,
+        lastTimestamp: new Date().toISOString(),
+      }));
+    });
+
+    // Update connection status when Pusher disconnects
+    pusherClient.connection.bind("disconnected", () => {
+      setSoketiStatus((prev) => ({
+        ...prev,
+        connected: false,
+        lastTimestamp: new Date().toISOString(),
+      }));
+    });
+
     pusherClient.bind("evt::notify-dispatch", (message: string) => {
-      notificationService.notifyInfo({ message });
+      toastService.inform(message);
+      setSoketiStatus((prev) => ({
+        ...prev,
+        lastEvent: "notify-dispatch",
+        lastTimestamp: new Date().toISOString(),
+      }));
     });
 
     pusherClient.bind("evt::invalidate-stops", (message: string | null) => {
-      if (message !== null && message !== "")
-        notificationService.notifyInfo({ message });
+      if (message !== null && message !== "") toastService.inform(message);
       void apiContext.routePlan.invalidate();
+      setSoketiStatus((prev) => ({
+        ...prev,
+        lastEvent: "invalidate-stops",
+        lastTimestamp: new Date().toISOString(),
+      }));
     });
 
     pusherClient.bind("evt::invalidate-route", (message: string | null) => {
-      if (message !== null && message !== "")
-        notificationService.notifyInfo({ message });
+      if (message !== null && message !== "") toastService.inform(message);
       void apiContext.routePlan.invalidate();
+      setSoketiStatus((prev) => ({
+        ...prev,
+        lastEvent: "invalidate-route",
+        lastTimestamp: new Date().toISOString(),
+      }));
     });
 
     pusherClient.bind("evt::update-route-status", (message: unknown) => {
-      notificationService.notifyInfo({
-        message: JSON.stringify(message) ?? "Route has been updated",
-      });
-
+      toastService.inform(JSON.stringify(message) ?? "Route has been updated");
       void apiContext.routePlan.invalidate();
+      setSoketiStatus((prev) => ({
+        ...prev,
+        lastEvent: "update-route-status",
+        lastTimestamp: new Date().toISOString(),
+      }));
     });
 
     return () => {
       pusherClient.unsubscribe("map");
+      pusherClient.connection.unbind("connected");
+      pusherClient.connection.unbind("disconnected");
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -178,6 +220,49 @@ export const RouteClient = () => {
       key: "mode",
       value: "plan",
     });
+  };
+
+  const testSoketiConnection = () => {
+    // Test the Soketi connection by triggering a client event
+    const testChannel = pusherClient.subscribe("test-channel");
+
+    // Check if we can subscribe to the channel
+    if (testChannel.subscribed) {
+      toastService.success("Successfully subscribed to test channel");
+    } else {
+      testChannel.bind("pusher:subscription_succeeded", () => {
+        toastService.success("Successfully subscribed to test channel");
+      });
+
+      testChannel.bind("pusher:subscription_error", (error: unknown) => {
+        toastService.error(`Subscription error: ${JSON.stringify(error)}`);
+      });
+    }
+
+    // Try to trigger a client event (requires enabling client events on server)
+    try {
+      const success = testChannel.trigger("client-test-event", {
+        message: "Test message from client",
+        timestamp: new Date().toISOString(),
+      });
+
+      if (success) {
+        toastService.inform("Client event triggered successfully");
+      } else {
+        toastService.inform("Client event may not have been triggered");
+      }
+    } catch (error) {
+      toastService.error(
+        `Error triggering client event: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    // Update connection status
+    setSoketiStatus((prev) => ({
+      ...prev,
+      lastEvent: "manual-test",
+      lastTimestamp: new Date().toISOString(),
+    }));
   };
 
   const { currentDepot } = useDepot();
@@ -223,6 +308,35 @@ export const RouteClient = () => {
             >
               <Rocket /> Route
             </Button>
+          </div>
+
+          <div className="p-1">
+            <Button
+              onClick={testSoketiConnection}
+              className="hover:bg-dark-gray bg-black text-white"
+            >
+              <Bug /> Test Soketi
+            </Button>
+          </div>
+
+          {/* Soketi Status Indicator */}
+          <div className="p-1 text-xs">
+            <div
+              className={`rounded p-2 ${soketiStatus.connected ? "bg-green-100" : "bg-red-100"}`}
+            >
+              <p>
+                Soketi: {soketiStatus.connected ? "Connected" : "Disconnected"}
+              </p>
+              {soketiStatus.lastEvent && (
+                <p>Last event: {soketiStatus.lastEvent}</p>
+              )}
+              {soketiStatus.lastTimestamp && (
+                <p>
+                  Last update:{" "}
+                  {new Date(soketiStatus.lastTimestamp).toLocaleTimeString()}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 

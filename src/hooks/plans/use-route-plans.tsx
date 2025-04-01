@@ -1,9 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 
-import type { OptimizationPlan } from "~/lib/validators/optimization";
 import { api } from "~/trpc/react";
 
-import optimizationService from "../../services/optimization";
 import { useSolidarityState } from "../optimized-data/use-solidarity-state";
 import { useDefaultMutationActions } from "../use-default-mutation-actions";
 
@@ -33,40 +31,45 @@ export const useRoutePlans = () => {
   const setOptimizedData =
     api.routePlan.optimizeWithVroom.useMutation(defaultActions);
 
+  const formatClientData = api.routeOptimization.formatClient.useMutation();
+  const formatDriverData = api.routeOptimization.formatDriver.useMutation();
+  const calculateOptimalPaths =
+    api.routeOptimization.calculateOptimalPaths.useMutation();
+
   const calculateRoutes = async (selectedJobIds?: string[]) => {
-    const jobs_bundles = optimizationService.formatClientData(
-      getRouteJobs?.data ?? [],
-    );
-    const vehicles = optimizationService.formatDriverData(
-      getRouteVehicles?.data ?? [],
-    );
+    const jobs_bundles = await formatClientData.mutateAsync({
+      data: getRouteJobs?.data ?? [],
+    });
+    const vehicles = await formatDriverData.mutateAsync({
+      data: getRouteVehicles?.data ?? [],
+    });
 
-    let jobs = jobs_bundles;
+    let jobs = jobs_bundles.data;
 
-    if (jobs.length === 0 || vehicles.length === 0) {
+    if (jobs.length === 0 || vehicles.data.length === 0) {
       return;
     }
 
     // Filter jobs if selectedJobIds is provided and not empty
     if (selectedJobIds && selectedJobIds.length > 0) {
-      jobs = jobs_bundles.filter((job) =>
+      jobs = jobs_bundles.data.filter((job) =>
         selectedJobIds.includes(job.description),
       );
     }
 
     const params = {
       jobs,
-      vehicles,
+      vehicles: vehicles.data,
       options: {
         g: true,
       },
     };
 
-    const results = await optimizationService.calculateOptimalPaths(params);
+    const results = await calculateOptimalPaths.mutateAsync(params);
 
     setOptimizedData.mutate({
       routeId: routeId,
-      plan: results as OptimizationPlan,
+      plan: results.data,
     });
   };
 

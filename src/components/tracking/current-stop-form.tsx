@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { useClient } from "~/providers/client";
-import { notificationService } from "~/services/notification";
 import { Navigation, PackageCheckIcon, PackageXIcon } from "lucide-react";
 import { useForm } from "react-hook-form";
 
+import { toastService } from "@dreamwalker-studios/toasts";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RouteStatus } from "@prisma/client";
 
@@ -36,12 +36,10 @@ export const CurrentStopForm = ({ initialData }: Props) => {
 
   const updateStopStatus = api.routePlan.updateOptimizedStop.useMutation({
     onSuccess: () => {
-      notificationService.notifySuccess({
-        message: "Stop status was successfully updated.",
-      });
+      toastService.success("Stop status was successfully updated.");
     },
-    onError: (error: unknown) => {
-      notificationService.notifyError({
+    onError: (error) => {
+      toastService.error({
         message: "There was an issue updating the stop status.",
         error,
       });

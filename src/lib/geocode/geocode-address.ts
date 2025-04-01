@@ -1,6 +1,5 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import axios from "axios";
+
 import { env } from "~/env";
 
 type GeocodeResult = {
@@ -9,30 +8,33 @@ type GeocodeResult = {
   lon: number;
 };
 
-export async function geocodeAddress(address: string) {
-  const geocodeCache: Record<string, unknown> = {};
+type GeocodingResponse = google.maps.GeocoderResponse;
 
-  const geocode_this_address = `${address}`;
-  if (!geocodeCache[geocode_this_address]) {
+const geocodeCache: Record<string, unknown> = {};
+
+export async function geocodeByAddress(address: string) {
+  if (!geocodeCache[address]) {
     const endpointEncodedAddress = `${env.GOOGLE_GEOCODING_ENDPOINT}?address=${encodeURIComponent(
-      geocode_this_address,
-    )}&key=${process.env.GOOGLE_API_KEY}`;
+      address,
+    )}&key=${env.GOOGLE_API_KEY}`;
 
     try {
-      const results = await axios.get(endpointEncodedAddress);
+      const results = await axios.get<GeocodingResponse>(
+        endpointEncodedAddress,
+      );
 
-      if (results.status === 200) {
+      if (results.status === 200 && results.data.results[0]) {
         const data = results.data.results[0];
-        geocodeCache[geocode_this_address] = {
+        geocodeCache[address] = {
           full_address: data.formatted_address,
-          lat: data.geometry.location.lat,
-          lon: data.geometry.location.lng,
+          lat: data.geometry.location.lat(),
+          lon: data.geometry.location.lng(),
         };
       }
     } catch (error) {
-      console.error("Failed to geocode address:", geocode_this_address, error);
+      console.error("Failed to geocode address:", address, error);
     }
   }
 
-  return geocodeCache[geocode_this_address] as GeocodeResult;
+  return geocodeCache[address] as GeocodeResult;
 }

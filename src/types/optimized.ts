@@ -1,6 +1,8 @@
 import type { RouteStatus } from "@prisma/client";
 
 import type { RouteData } from "./route";
+import type { Polyline } from "~/types/geolocation";
+import { VroomOptimizationData } from "~/lib/validators/optimization";
 
 export type OptimizedStop = {
   id: string;
@@ -115,4 +117,9 @@ export type OptimizationData = {
   routes: RouteData[];
   summary: SummaryData;
   unassigned: UnassignedData[];
+};
+
+export type VroomOptimalPaths = {
+  geometry: Polyline[];
+  data: VroomOptimizationData;
 };

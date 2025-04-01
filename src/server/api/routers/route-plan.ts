@@ -5,6 +5,9 @@ import { RouteStatus } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import type { ClientJobBundle } from "~/lib/validators/client-job";
+import { generateDriverPassCode } from "~/utils/server/auth-driver-passcode";
+import { emailService } from "~/lib/email";
+import NewRouteTemplate from "~/lib/email/email-templates/new-route-template";
 import { pusherServer } from "~/lib/soketi/server";
 import { driverVehicleSchema } from "~/lib/validators/driver-vehicle";
 import { optimizationPlanSchema } from "~/lib/validators/optimization";
@@ -480,6 +483,45 @@ export const routePlanRouter = createTRPCRouter({
       return {
         data: routeVehicles,
         message: "Route drivers were successfully set.",
+      };
+    }),
+
+  assignAndNotifyDrivers: protectedProcedure
+    .input(
+      z
+        .array(
+          z.object({
+            email: z.string().email(),
+            url: z.string().url(),
+            passcode: z.string(),
+          }),
+        )
+        .min(1),
+    )
+    .mutation(async ({ input: emailBundles }) => {
+      const data = await Promise.all(
+        emailBundles.map(
+          async (bundle: { email: string; url: string; passcode: string }) => {
+            const emailData = await emailService.sendEmail({
+              from: "Artisanal Futures <no-reply@artisanalfutures.org>",
+              to: bundle.email,
+              subject: "New Route Assignment from Solidarity Pathways",
+              template: NewRouteTemplate,
+              data: {
+                email: bundle.email,
+                loginCode: bundle.passcode,
+                url: bundle.url,
+              },
+            });
+
+            return emailData;
+          },
+        ),
+      );
+
+      return {
+        data,
+        message: "Route(s) sent to driver(s) successfully",
       };
     }),
 });

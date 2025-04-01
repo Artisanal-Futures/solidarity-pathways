@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { useEffect, useRef, useState } from "react";
-import { notificationService } from "~/services/notification";
 import axios from "axios";
 import { useSession } from "next-auth/react";
+
+import { toastService } from "@dreamwalker-studios/toasts";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -51,12 +53,11 @@ export const DriverVerificationDialog = ({
           setApproval(true);
         }
       })
-      .catch((err) => {
-        notificationService.notifyError({
+      .catch((error) => {
+        toastService.error({
           message: "Invalid email or magic code. Please try again",
-          error: err,
+          error,
         });
-        console.error(err);
       });
   };
 

@@ -47,6 +47,9 @@ export const env = createEnv({
 
     // Resend
     RESEND_API_KEY: z.string(),
+
+    // VROOM
+    OPTIMIZATION_ENDPOINT: z.string(),
   },
 
   /**
@@ -97,6 +100,9 @@ export const env = createEnv({
     RESEND_API_KEY: process.env.RESEND_API_KEY,
 
     NEXT_PUBLIC_LOGO_URL: process.env.NEXT_PUBLIC_LOGO_URL,
+
+    // VROOM
+    OPTIMIZATION_ENDPOINT: process.env.OPTIMIZATION_ENDPOINT,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

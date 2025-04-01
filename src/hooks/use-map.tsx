@@ -3,7 +3,6 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 import type { LatLngExpression, Map } from "leaflet";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatGeometryString } from "~/services/optimization/aws-vroom/utils";
 import { useMapStore } from "~/stores/use-map-store";
 import axios from "axios";
 import L from "leaflet";
@@ -12,6 +11,7 @@ import type { ClientJobBundle } from "~/lib/validators/client-job";
 import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
 import type { Coordinates } from "~/types/geolocation";
 import { getCurrentLocation } from "~/lib/helpers/get-current-location";
+import { formatGeometryString } from "~/lib/optimization/vroom-optimization";
 import { api } from "~/trpc/react";
 
 import { useOptimizedRoutePlan } from "./optimized-data/use-optimized-route-plan";

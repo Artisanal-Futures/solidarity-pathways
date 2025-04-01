@@ -2,7 +2,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { z } from "zod";
 
 import type { Customer } from "~/types/job";
-import { geocodeAddress } from "~/lib/geocode/geocode-address";
+import { geocodeByAddress } from "~/lib/geocode/geocode-address";
 
 export const clientRouter = createTRPCRouter({
   import: protectedProcedure
@@ -45,7 +45,7 @@ export const clientRouter = createTRPCRouter({
           ];
 
           for (const stopInfo of demoStopInformation) {
-            const geocodedData = await geocodeAddress(stopInfo.address);
+            const geocodedData = await geocodeByAddress(stopInfo.address);
 
             const client: Customer = {
               name: stopInfo.name,

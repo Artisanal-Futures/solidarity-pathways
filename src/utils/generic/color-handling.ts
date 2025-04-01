@@ -27,7 +27,6 @@ export const getColor = (id: number) => {
   };
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getStyle = (feature: {
   geometry: { properties: { color: number } };
 }) => {
