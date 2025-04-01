@@ -14,6 +14,11 @@ export const env = createEnv({
         : z.string().optional(),
     AUTH_DISCORD_ID: z.string(),
     AUTH_DISCORD_SECRET: z.string(),
+    AUTH_AUTH0_ID: z.string(),
+    AUTH_AUTH0_SECRET: z.string(),
+    AUTH_GOOGLE_ID: z.string(),
+    AUTH_GOOGLE_SECRET: z.string(),
+
     DATABASE_URL: z.string().url(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
@@ -30,7 +35,7 @@ export const env = createEnv({
         // str ??
         process.env.NODE_ENV === "production"
           ? process.env.NEXTAUTH_URL?.replace(/^https?:\/\//, "").replace(
-              /^generate\./,
+              /^solidarity\./,
               "",
             )
           : "localhost",
@@ -62,10 +67,6 @@ export const env = createEnv({
     NEXT_PUBLIC_PUSHER_HOST: z.string(),
     NEXT_PUBLIC_PUSHER_PORT: z.string(),
     NEXT_PUBLIC_PUSHER_APP_KEY: z.string(),
-    NEXT_PUBLIC_HOSTNAME: z.string(),
-
-    NEXT_PUBLIC_GOOGLE_MAP_API_KEY: z.string(),
-
     NEXT_PUBLIC_LOGO_URL: z.string(),
   },
 
@@ -77,6 +78,10 @@ export const env = createEnv({
     AUTH_SECRET: process.env.AUTH_SECRET,
     AUTH_DISCORD_ID: process.env.AUTH_DISCORD_ID,
     AUTH_DISCORD_SECRET: process.env.AUTH_DISCORD_SECRET,
+    AUTH_AUTH0_ID: process.env.AUTH_AUTH0_ID,
+    AUTH_AUTH0_SECRET: process.env.AUTH_AUTH0_SECRET,
+    AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID,
+    AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET,
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
     HOSTNAME: process.env.HOSTNAME,
@@ -88,9 +93,6 @@ export const env = createEnv({
     NEXT_PUBLIC_PUSHER_APP_KEY: process.env.NEXT_PUBLIC_PUSHER_APP_KEY,
     PUSHER_APP_ID: process.env.PUSHER_APP_ID,
     PUSHER_APP_SECRET: process.env.PUSHER_APP_SECRET,
-
-    NEXT_PUBLIC_HOSTNAME: process.env.NEXT_PUBLIC_HOSTNAME,
-    NEXT_PUBLIC_GOOGLE_MAP_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAP_API_KEY,
 
     // Google Maps
     GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,

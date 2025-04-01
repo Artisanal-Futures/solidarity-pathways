@@ -5,6 +5,7 @@ import { RouteStatus } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import type { ClientJobBundle } from "~/lib/validators/client-job";
+import { env } from "~/env";
 import { generateDriverPassCode } from "~/utils/server/auth-driver-passcode";
 import { emailService } from "~/lib/email";
 import NewRouteTemplate from "~/lib/email/email-templates/new-route-template";
@@ -492,7 +493,7 @@ export const routePlanRouter = createTRPCRouter({
         .array(
           z.object({
             email: z.string().email(),
-            url: z.string().url(),
+            url: z.string(),
             passcode: z.string(),
           }),
         )
@@ -510,7 +511,7 @@ export const routePlanRouter = createTRPCRouter({
               data: {
                 email: bundle.email,
                 loginCode: bundle.passcode,
-                url: bundle.url,
+                url: `${env.NEXTAUTH_URL}/${bundle.url}`,
               },
             });
 

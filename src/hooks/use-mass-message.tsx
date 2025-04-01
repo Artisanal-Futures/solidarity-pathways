@@ -2,7 +2,6 @@
 
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/prefer-promise-reject-errors */
-import { env } from "~/env";
 import { api } from "~/trpc/react";
 
 import { generateDriverPassCode } from "../utils/server/auth-driver-passcode";
@@ -37,7 +36,7 @@ export const useMassMessage = () => {
 
       return {
         email: route?.vehicle?.driver?.email,
-        url: `${env.NEXT_PUBLIC_HOSTNAME}/${depotId}/route/${routeId}/path/${route.id}?driverId=${route.vehicleId}&pc=${passcode}`,
+        url: `${depotId}/route/${routeId}/path/${route.id}?driverId=${route.vehicleId}&pc=${passcode}`,
         passcode: currentDepot?.magicCode ?? "",
       };
     });
