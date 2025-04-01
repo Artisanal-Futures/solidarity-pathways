@@ -1,15 +1,17 @@
 import type { DivIcon } from "leaflet";
 import type { MarkerProps } from "react-leaflet";
 import { useMemo } from "react";
-import { getColor } from "~/utils/generic/color-handling";
+import { Building, Truck } from "lucide-react";
 import { Marker, Popup } from "react-leaflet";
 
-import type { Driver, RouteData, Stop } from "~/types";
+import type { Driver } from "~/types/driver";
+import type { RouteData } from "~/types/route";
+import type { Stop } from "~/types/stop";
+import { getColor } from "~/utils/generic/color-handling";
 
-import { DepotIcon } from "./depot-icon";
+import { MapIcon } from "./map-icon";
 import { PositionIcon } from "./position-icon";
 import { StopIcon } from "./stop-icon";
-import { TruckIcon } from "./truck-icon";
 
 type Props = MarkerProps & {
   variant: "stop" | "car" | "depot" | "currentPosition";
@@ -52,9 +54,9 @@ export const RouteMarker = ({
         case "currentPosition":
           return PositionIcon();
         case "depot":
-          return DepotIcon(calculatedColor.text!);
+          return MapIcon({ color: calculatedColor.text!, Icon: Building });
         default:
-          return TruckIcon(calculatedColor.text!);
+          return MapIcon({ color: calculatedColor.text!, Icon: Truck });
       }
     }
   }, [variant, calculatedColor, stopId, useThisIconInstead]);

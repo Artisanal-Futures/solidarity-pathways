@@ -1,6 +1,8 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
 import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type Param = {
   key: string;

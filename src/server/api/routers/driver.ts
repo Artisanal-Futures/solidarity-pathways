@@ -1,7 +1,13 @@
+import { driverVehicleDataForNewLatLng } from "~/data/driver-data";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { z } from "zod";
 
-import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
+import type { PrismaClient } from "@prisma/client";
+
+import type {
+  DriverVehicleBundle,
+  NewDriverVehicleBundle,
+} from "~/lib/validators/driver-vehicle";
 import {
   driverSchema,
   newDriverVehicleSchema,
@@ -9,106 +15,75 @@ import {
 
 export const driverRouter = createTRPCRouter({
   // This creates and adds to existing depots / routes
+
+  createByLatLng: protectedProcedure
+    .input(
+      z.object({
+        latitude: z.number(),
+        longitude: z.number(),
+        depotId: z.string(),
+        routeId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const driver = driverVehicleDataForNewLatLng(
+        input.latitude,
+        input.longitude,
+      );
+
+      const bundle = await createDriver({
+        db: ctx.db,
+        data: driver,
+        depotId: input.depotId,
+        routeId: input.routeId,
+      });
+
+      return {
+        data: bundle,
+        message: "Driver was successfully created via lat/lng.",
+      };
+    }),
+
+  create: protectedProcedure
+    .input(
+      z.object({
+        data: newDriverVehicleSchema,
+        depotId: z.string(),
+        routeId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const bundle = await createDriver({
+        db: ctx.db,
+        data: input.data,
+        depotId: input.depotId,
+        routeId: input.routeId,
+      });
+
+      return {
+        data: bundle,
+        message: "Driver was successfully created.",
+      };
+    }),
   createMany: protectedProcedure
     .input(
       z.object({
         data: z.array(newDriverVehicleSchema),
         depotId: z.string(),
         routeId: z.string().optional(),
-        override: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const res = await Promise.all(
         input.data.map(async (driverVehicle) => {
-          const { driver: driverData, vehicle: vehicleData } = driverVehicle;
-          const { address: driverAddress, ...driverRest } = driverData;
-          const { startAddress, endAddress, breaks, ...vehicleRest } =
-            vehicleData;
-
-          //Create driver for depot
-          const driver = await ctx.db.driver.create({
-            data: {
-              depotId: input.depotId,
-              ...driverRest,
-
-              address: { create: { ...driverAddress } },
-            },
-            include: { address: true },
-          });
-
-          const defaultVehicleData = {
-            ...vehicleRest,
+          const bundle = await createDriver({
+            db: ctx.db,
+            data: driverVehicle,
             depotId: input.depotId,
-            startAddress: { create: { ...startAddress } },
-            breaks: {
-              create: breaks?.map((b) => ({
-                duration: b?.duration ?? 1800, //30 minutes in seconds
-                start: b?.start ?? vehicleRest.shiftStart,
-                end: b?.end ?? vehicleRest.shiftEnd,
-              })),
-            },
-          };
-          //Create default vehicle for driver
-          const vehicle = await ctx.db.vehicle.create({
-            data: { ...defaultVehicleData },
-            include: {
-              startAddress: true,
-              endAddress: true,
-              breaks: true,
-            },
+            routeId: input.routeId,
           });
 
-          //Connect default vehicle to driver
-          await ctx.db.driver.update({
-            where: { id: driver.id },
-            data: {
-              vehicles: { connect: { id: vehicle.id } },
-              defaultVehicleId: vehicle.id,
-            },
-          });
-
-          if (endAddress) {
-            const vehicleEndAddress = await ctx.db.address.create({
-              data: { ...endAddress },
-            });
-            await ctx.db.vehicle.update({
-              where: { id: vehicle.id },
-              data: {
-                endAddress: { connect: { id: vehicleEndAddress.id } },
-              },
-            });
-          }
-          //If routeId is provided, connect new vehicle to route
-          if (input.routeId) {
-            const routeVehicle = await ctx.db.vehicle.create({
-              data: {
-                driverId: driver.id,
-                ...defaultVehicleData,
-              },
-            });
-
-            if (endAddress) {
-              const routeVehicleEndAddress = await ctx.db.address.create({
-                data: { ...endAddress },
-              });
-              await ctx.db.vehicle.update({
-                where: { id: routeVehicle.id },
-                data: {
-                  endAddress: { connect: { id: routeVehicleEndAddress.id } },
-                },
-              });
-            }
-
-            await ctx.db.route.update({
-              where: { id: input.routeId },
-              data: {
-                vehicles: { connect: { id: routeVehicle.id } },
-              },
-            });
-          }
-
-          return { driver, vehicle } as DriverVehicleBundle;
+          return bundle;
         }),
       );
 
@@ -209,3 +184,103 @@ export const driverRouter = createTRPCRouter({
       };
     }),
 });
+
+const createDriver = async ({
+  db,
+  data,
+  depotId,
+  routeId,
+}: {
+  db: PrismaClient;
+  data: NewDriverVehicleBundle;
+  depotId: string;
+  routeId: string | undefined;
+}) => {
+  const { driver: driverData, vehicle: vehicleData } = data;
+  const { address: driverAddress, ...driverRest } = driverData;
+  const { startAddress, endAddress, breaks, ...vehicleRest } = vehicleData;
+
+  //Create driver for depot
+  const driver = await db.driver.create({
+    data: {
+      depotId,
+      ...driverRest,
+
+      address: { create: { ...driverAddress } },
+    },
+    include: { address: true },
+  });
+
+  const defaultVehicleData = {
+    ...vehicleRest,
+    depotId,
+    startAddress: { create: { ...startAddress } },
+    breaks: {
+      create: breaks?.map((b) => ({
+        duration: b?.duration ?? 1800, //30 minutes in seconds
+        start: b?.start ?? vehicleRest.shiftStart,
+        end: b?.end ?? vehicleRest.shiftEnd,
+      })),
+    },
+  };
+  //Create default vehicle for driver
+  const vehicle = await db.vehicle.create({
+    data: { ...defaultVehicleData },
+    include: {
+      startAddress: true,
+      endAddress: true,
+      breaks: true,
+    },
+  });
+
+  //Connect default vehicle to driver
+  await db.driver.update({
+    where: { id: driver.id },
+    data: {
+      vehicles: { connect: { id: vehicle.id } },
+      defaultVehicleId: vehicle.id,
+    },
+  });
+
+  if (endAddress) {
+    const vehicleEndAddress = await db.address.create({
+      data: { ...endAddress },
+    });
+    await db.vehicle.update({
+      where: { id: vehicle.id },
+      data: {
+        endAddress: { connect: { id: vehicleEndAddress.id } },
+      },
+    });
+  }
+  //If routeId is provided, connect new vehicle to route
+  if (routeId) {
+    const routeVehicle = await db.vehicle.create({
+      data: {
+        driverId: driver.id,
+        ...defaultVehicleData,
+      },
+    });
+
+    if (endAddress) {
+      const routeVehicleEndAddress = await db.address.create({
+        data: { ...endAddress },
+      });
+      await db.vehicle.update({
+        where: { id: routeVehicle.id },
+        data: {
+          endAddress: { connect: { id: routeVehicleEndAddress.id } },
+        },
+      });
+    }
+
+    await db.route.update({
+      where: { id: routeId },
+      data: {
+        vehicles: { connect: { id: routeVehicle.id } },
+      },
+    });
+  }
+
+  return { driver, vehicle } as DriverVehicleBundle;
+};

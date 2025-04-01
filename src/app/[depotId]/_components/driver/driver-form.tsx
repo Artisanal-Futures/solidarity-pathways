@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { uniqueId } from "lodash";
+import { FileCog, Pencil } from "lucide-react";
+import { useForm } from "react-hook-form";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import type { DriverFormValues } from "~/lib/validators/driver-form";
+import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
 import { formatDriverFormDataToBundle } from "~/utils/driver-vehicle/format-drivers.wip";
 import {
   metersToMiles,
@@ -8,25 +16,17 @@ import {
   secondsToMinutes,
   unixSecondsToMilitaryTime,
 } from "~/utils/generic/format-utils.wip";
-import { uniqueId } from "lodash";
-import { FileCog, Pencil } from "lucide-react";
-import { useSession } from "next-auth/react";
-import { useForm } from "react-hook-form";
-
-import { zodResolver } from "@hookform/resolvers/zod";
-
-import type { DriverFormValues } from "~/lib/validators/driver-form";
-import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
-import type { Coordinates } from "~/types/geolocation";
 import { cn } from "~/lib/utils";
 import { driverFormSchema } from "~/lib/validators/driver-form";
 import { api } from "~/trpc/react";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
+import { useFixDismissibleLayer } from "~/hooks/use-fix-dismissible-layer";
 import { Accordion } from "~/components/ui/accordion";
 import { Button } from "~/components/ui/button";
 import { Form } from "~/components/ui/form";
 import { DeleteDialog } from "~/components/delete-dialog";
+import { LoadButton } from "~/components/shared/load-button";
 
 import { DriverDetailsSection } from "./driver-details.form";
 import { ShiftDetailsSection } from "./shift-details.form";
@@ -39,25 +39,15 @@ type Props = {
 
 export const DriverForm = ({ handleOnOpenChange, activeDriver }: Props) => {
   const { routeId, depotId } = useSolidarityState();
-  const { status } = useSession();
 
   const { defaultActions } = useDefaultMutationActions({
-    invalidateEntities: ["driver", "routePlan", "routeMessaging"],
+    invalidateEntities: ["driver", "vehicle", "routePlan"],
   });
 
-  const createDriversWithVehicles =
-    api.driver.createMany.useMutation(defaultActions);
-
+  const createDriver = api.driver.create.useMutation(defaultActions);
   const deleteVehicle = api.vehicle.delete.useMutation(defaultActions);
-
-  const updateVehicleDetailsMutation =
-    api.vehicle.update.useMutation(defaultActions);
-
-  const updateDriverDetailsMutation =
-    api.driver.update.useMutation(defaultActions);
-
-  const updateDriverChannelMutation =
-    api.routeMessaging.updateDriverChannelByEmail.useMutation(defaultActions);
+  const updateVehicle = api.vehicle.update.useMutation(defaultActions);
+  const updateDriver = api.driver.update.useMutation(defaultActions);
 
   const [editDriver, setEditDriver] = useState(false);
 
@@ -80,8 +70,7 @@ export const DriverForm = ({ handleOnOpenChange, activeDriver }: Props) => {
         formatted: activeDriver?.driver.address.formatted ?? undefined,
         latitude: activeDriver?.driver.address.latitude ?? undefined,
         longitude: activeDriver?.driver.address.longitude ?? undefined,
-      } as Coordinates & { formatted: string },
-
+      },
       startAddress: {
         formatted: activeDriver?.vehicle.startAddress.formatted ?? undefined,
         latitude: activeDriver?.vehicle.startAddress.latitude ?? undefined,
@@ -93,23 +82,20 @@ export const DriverForm = ({ handleOnOpenChange, activeDriver }: Props) => {
         longitude: activeDriver?.vehicle?.endAddress?.longitude ?? undefined,
       },
 
-      shiftStart: activeDriver?.vehicle.shiftStart
-        ? unixSecondsToMilitaryTime(activeDriver?.vehicle.shiftStart)
-        : "09:00",
-      shiftEnd: activeDriver?.vehicle.shiftEnd
-        ? unixSecondsToMilitaryTime(activeDriver?.vehicle.shiftEnd)
-        : "17:00",
+      shiftStart:
+        unixSecondsToMilitaryTime(activeDriver?.vehicle.shiftStart) ?? "09:00",
+      shiftEnd:
+        unixSecondsToMilitaryTime(activeDriver?.vehicle.shiftEnd) ?? "17:00",
 
       breaks:
         activeDriver?.vehicle.breaks && activeDriver?.vehicle.breaks.length > 0
           ? activeDriver?.vehicle.breaks.map((b) => ({
               ...b,
-              duration: secondsToMinutes(b.duration),
+              duration: secondsToMinutes(b.duration) ?? 30,
             }))
           : [{ id: Number(uniqueId()), duration: 30 }],
-      maxTravelTime: secondsToMinutes(
-        activeDriver?.vehicle?.maxTravelTime ?? 300,
-      ),
+      maxTravelTime:
+        secondsToMinutes(activeDriver?.vehicle?.maxTravelTime) ?? 30,
       maxTasks: activeDriver?.vehicle.maxTasks ?? 100,
       maxDistance: Math.round(
         metersToMiles(activeDriver?.vehicle.maxDistance ?? 100),
@@ -118,18 +104,14 @@ export const DriverForm = ({ handleOnOpenChange, activeDriver }: Props) => {
     },
   });
 
-  useEffect(() => {
-    setTimeout(() => {
-      document.body.style.pointerEvents = "";
-    }, 500);
-  }, []);
+  useFixDismissibleLayer();
 
   const onSubmit = async (data: DriverFormValues) => {
     const bundle = formatDriverFormDataToBundle(data);
 
     if (!activeDriver) {
-      await createDriversWithVehicles.mutateAsync({
-        data: [bundle],
+      await createDriver.mutateAsync({
+        data: bundle,
         depotId,
         routeId,
       });
@@ -137,19 +119,13 @@ export const DriverForm = ({ handleOnOpenChange, activeDriver }: Props) => {
       return;
     }
 
-    await updateVehicleDetailsMutation.mutateAsync({
+    await updateVehicle.mutateAsync({
       ...bundle.vehicle,
       routeId,
     });
 
     if (editDriver) {
-      await updateDriverChannelMutation.mutateAsync({
-        email: data.email,
-        channelName: activeDriver?.driver?.email,
-        depotId,
-      });
-
-      await updateDriverDetailsMutation.mutateAsync({
+      await updateDriver.mutateAsync({
         driver: bundle.driver,
       });
     }
@@ -169,7 +145,7 @@ export const DriverForm = ({ handleOnOpenChange, activeDriver }: Props) => {
     const temp = formatDriverFormDataToBundle(data);
 
     if (!!activeDriver?.driver?.defaultVehicleId) {
-      updateVehicleDetailsMutation.mutate({
+      updateVehicle.mutate({
         ...temp.vehicle,
         id: activeDriver?.driver?.defaultVehicleId,
         routeId,
@@ -187,9 +163,13 @@ export const DriverForm = ({ handleOnOpenChange, activeDriver }: Props) => {
           {activeDriver && (
             <div className="flex w-full flex-col gap-3 border-b bg-white p-4">
               <div className="flex items-center justify-between gap-3">
-                <Button type="submit" className="flex-1">
+                <LoadButton
+                  type="submit"
+                  className="flex-1"
+                  isLoading={updateVehicle.isPending || updateDriver.isPending}
+                >
                   {activeDriver ? "Update" : "Add"} route vehicle
-                </Button>
+                </LoadButton>
                 <DeleteDialog onConfirm={onDelete} />
               </div>
             </div>
@@ -198,15 +178,13 @@ export const DriverForm = ({ handleOnOpenChange, activeDriver }: Props) => {
           {!activeDriver && (
             <div className="flex w-full flex-col gap-3 border-b bg-white p-4">
               <div className="flex items-center justify-between gap-3">
-                {status === "authenticated" && (
-                  <Button type="submit" className="flex-1" variant={"outline"}>
-                    Save driver to depot
-                  </Button>
-                )}
-
-                <Button type="submit" className="flex-1">
+                <LoadButton
+                  type="submit"
+                  className="flex-1"
+                  isLoading={createDriver.isPending}
+                >
                   Add driver
-                </Button>
+                </LoadButton>
               </div>
             </div>
           )}
@@ -217,7 +195,9 @@ export const DriverForm = ({ handleOnOpenChange, activeDriver }: Props) => {
               collapsible
               className="flex h-full w-full flex-col px-4"
               value={accordionValue}
-              onValueChange={setAccordionValue}
+              onValueChange={(value) => {
+                setAccordionValue(value);
+              }}
             >
               {(!activeDriver || editDriver) && (
                 <DriverDetailsSection form={form} />

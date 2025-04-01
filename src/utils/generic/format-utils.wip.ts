@@ -13,7 +13,9 @@ export function militaryTimeToUnixSeconds(militaryTime: string): number {
   return unixSeconds;
 }
 
-export function unixSecondsToMilitaryTime(unixSeconds: number): string {
+export function unixSecondsToMilitaryTime(unixSeconds: number | undefined) {
+  if (!unixSeconds) return null;
+
   // Create a new Date object using the provided Unix seconds
   const date = new Date(unixSeconds * 1000);
 
@@ -71,7 +73,9 @@ export function minutesToSeconds(minutesString: string | number): number {
   return seconds;
 }
 
-export function secondsToMinutes(seconds: string | number): number {
+export function secondsToMinutes(seconds: string | number | undefined) {
+  if (!seconds) return null;
+
   // Parse the input to ensure it's a valid number
   const parsedSeconds =
     typeof seconds === "string" ? parseInt(seconds, 10) : seconds;

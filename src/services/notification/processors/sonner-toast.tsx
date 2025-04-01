@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 import { toast } from "sonner";
-import { ScrollArea } from "~/components/ui/scroll-area";
+
 import type { NotificationProcessor } from "../factory";
+import { ScrollArea } from "~/components/ui/scroll-area";
 
 export const SonnerNotificationProcessor: NotificationProcessor = {
   notifySuccess: ({ message }) => {
@@ -11,7 +12,7 @@ export const SonnerNotificationProcessor: NotificationProcessor = {
     });
   },
 
-  notifyError: ({ error, message }) => {
+  notifyError: ({ error }) => {
     console.error("Notification Error:", error);
     // return toast.error(message, {
     //   position: "top-center",

@@ -2,10 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { create } from "zustand";
 
-type LocationMessage = {
-  error: boolean;
-  message: string;
-};
+import type { LocationMessage } from "~/types/geolocation";
 
 interface MapState {
   flyToDriver: boolean;

@@ -72,6 +72,8 @@ export const newDriverVehicleSchema = z.object({
 });
 
 export type DriverVehicleBundle = z.infer<typeof driverVehicleSchema>;
-export type NewDriverVehicleBundles = z.infer<typeof newDriverVehicleSchema>;
+export type NewDriverVehicleBundle = z.infer<typeof newDriverVehicleSchema>;
 export type Driver = z.infer<typeof driverSchema>;
 export type Vehicle = z.infer<typeof vehicleSchema>;
+
+export const driverTypeSchema = z.enum(["DRIVER", "TEMP"]);

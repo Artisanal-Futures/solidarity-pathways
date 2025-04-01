@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-expressions */
 import { useCallback, useEffect, useRef } from "react";
 
 export default function useTimeout(callback: () => unknown, delay: number) {

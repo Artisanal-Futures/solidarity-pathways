@@ -1,17 +1,17 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { useDriversStore } from "~/stores/use-drivers-store";
 
 import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
+import { checkIfVehicleExistsInRoute } from "~/lib/helpers/get-specifics";
 import { api } from "~/trpc/react";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
-import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import { useUrlParams } from "~/hooks/use-url-params";
 
 type DriverContextType = {
   activeDriverId: string | null;
-  setActiveDriverId: (id: string | null) => Promise<void>;
+  setActiveDriverId: (id: string | null) => void;
   isDriverActive: (id: string) => boolean;
   activeDriverData: DriverVehicleBundle | null;
   isLoading: boolean;
@@ -20,9 +20,9 @@ type DriverContextType = {
   openDriverEdit: (id: string) => void;
   closeDriverEdit: () => void;
   onSheetOpenChange: (open: boolean) => void;
-  findDriverByEmail: (
-    email: string | null,
-  ) => Promise<DriverVehicleBundle | null>;
+
+  findVehicleById: (id: string) => DriverVehicleBundle | null;
+  findDriverByEmail: (email: string) => DriverVehicleBundle | null;
 };
 
 const DriverContext = createContext<DriverContextType | undefined>(undefined);
@@ -30,81 +30,72 @@ const DriverContext = createContext<DriverContextType | undefined>(undefined);
 export const DriverProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const { defaultActions } = useDefaultMutationActions({
-    invalidateEntities: ["driver", "routePlan"],
-  });
   const { updateUrlParams } = useUrlParams();
   const { routeId } = useSolidarityState();
-  const driversStore = useDriversStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [activeDriver, setActiveDriver] = useState<DriverVehicleBundle | null>(
+    null,
+  );
+  const [isDriverSheetOpen, setIsDriverSheetOpen] = useState(false);
 
-  const getVehicleByIdControlledMutation =
-    api.routePlan.getVehicleByIdControlled.useMutation({
-      onSettled: defaultActions.onSettled,
-    });
-
-  const findDriverByEmailMutation = api.routePlan.getDriverByEmail.useMutation({
-    onSettled: defaultActions.onSettled,
+  const getRouteVehicles = api.vehicle.getBundles.useQuery(routeId, {
+    enabled: !!routeId,
   });
 
-  const getActiveDriver = async (id: string | null) => {
+  const findVehicleById = (id: string): DriverVehicleBundle | null => {
     if (!id) return null;
-    const driver = await getVehicleByIdControlledMutation.mutateAsync({
-      routeId,
-      vehicleId: id,
+    return checkIfVehicleExistsInRoute({
+      id,
+      vehicleBundles: getRouteVehicles.data ?? [],
     });
-    return driver;
   };
 
-  const findDriverByEmail = async (email: string | null) => {
-    if (!email) return null;
-    const driver = await findDriverByEmailMutation.mutateAsync({
-      email,
-      routeId,
-    });
-
-    return driver;
+  const findDriverByEmail = (email: string): DriverVehicleBundle | null => {
+    return (
+      getRouteVehicles.data?.find(
+        (vehicle) => vehicle.driver.email === email,
+      ) ?? null
+    );
   };
-
-  const setActiveDriverId = async (id: string | null) => {
+  const setActiveDriverId = (id: string | null) => {
     setIsLoading(true);
     updateUrlParams({ key: "driverId", value: id });
 
     if (id) {
-      const driver = await getVehicleByIdControlledMutation.mutateAsync({
-        routeId,
-        vehicleId: id,
+      const driver = checkIfVehicleExistsInRoute({
+        id,
+        vehicleBundles: getRouteVehicles.data ?? [],
       });
 
       if (driver) {
-        driversStore.setActiveDriver(driver);
+        setActiveDriver(driver);
       } else {
-        driversStore.setActiveDriverById(null);
+        setActiveDriver(null);
       }
     } else {
-      driversStore.setActiveDriverById(null);
+      setActiveDriver(null);
     }
 
     setIsLoading(false);
   };
 
   const isDriverActive = (id: string) => {
-    return driversStore.activeDriver?.vehicle.id === id;
+    return activeDriver?.vehicle.id === id;
   };
 
   const openDriverEdit = (id: string) => {
     void setActiveDriverId(id);
-    driversStore.setIsDriverSheetOpen(true);
+    setIsDriverSheetOpen(true);
   };
 
   const closeDriverEdit = () => {
-    driversStore.setIsDriverSheetOpen(false);
+    setIsDriverSheetOpen(false);
     void setActiveDriverId(null);
   };
 
   const onSheetOpenChange = (open: boolean) => {
     if (!open) void setActiveDriverId(null);
-    driversStore.setIsDriverSheetOpen(open);
+    setIsDriverSheetOpen(open);
   };
 
   useEffect(() => {
@@ -115,17 +106,18 @@ export const DriverProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const value = {
-    activeDriverId: driversStore.activeDriver?.vehicle.id ?? null,
+    activeDriverId: activeDriver?.vehicle.id ?? null,
     setActiveDriverId,
     isDriverActive,
-    activeDriverData: driversStore.activeDriver,
+    activeDriverData: activeDriver,
     isLoading,
-    isDriverSheetOpen: driversStore.isDriverSheetOpen,
-    setIsDriverSheetOpen: driversStore.setIsDriverSheetOpen,
+    isDriverSheetOpen,
+    setIsDriverSheetOpen,
     openDriverEdit,
     closeDriverEdit,
     onSheetOpenChange,
 
+    findVehicleById,
     findDriverByEmail,
   };
 

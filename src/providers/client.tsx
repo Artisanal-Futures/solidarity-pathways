@@ -1,10 +1,10 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { useStopsStore } from "~/stores/use-stops-store";
 
 import type { ClientJobBundle } from "~/lib/validators/client-job";
-import { checkIfJobExistsInRoute } from "~/lib/helpers/get-specfiic";
+import { checkIfJobExistsInRoute } from "~/lib/helpers/get-specifics";
 import { api } from "~/trpc/react";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { useUrlParams } from "~/hooks/use-url-params";
@@ -30,6 +30,8 @@ type ClientContextType = {
   findJobById: (id: string) => ClientJobBundle | null;
   setActiveJob: (job: ClientJobBundle) => void;
   routeJobs: ClientJobBundle[];
+  selectedJobIds: string[];
+  setSelectedJobIds: (ids: string[]) => void;
 };
 
 const ClientContext = createContext<ClientContextType | undefined>(undefined);
@@ -39,10 +41,17 @@ export const ClientProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const { updateUrlParams } = useUrlParams();
   const { routeId } = useSolidarityState();
-  const stopsStore = useStopsStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [activeJobId, setActiveJobIdState] = useState<string | null>(null);
+  const [activeJobData, setActiveJobData] = useState<ClientJobBundle | null>(
+    null,
+  );
+  const [isJobSheetOpen, setIsJobSheetOpen] = useState(false);
+  const [isFieldJobSheetOpen, setIsFieldJobSheetOpen] = useState(false);
+  const [jobSheetMode, setJobSheetMode] = useState("create-new");
+  const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
 
-  const getJobs = api.job.getAllFromRoute.useQuery(routeId, {
+  const getJobs = api.job.getBundles.useQuery(routeId, {
     enabled: !!routeId,
   });
 
@@ -57,12 +66,13 @@ export const ClientProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const setActiveJob = (job: ClientJobBundle) => {
     console.log("setting active job", job);
-    stopsStore.setActiveLocation(job);
+    setActiveJobData(job);
   };
 
-  const setActiveJobId = (id: string | null) => {
+  const setActiveJobId = async (id: string | null) => {
     setIsLoading(true);
     updateUrlParams({ key: "jobId", value: id });
+    setActiveJobIdState(id);
 
     if (id) {
       const job = checkIfJobExistsInRoute({
@@ -72,87 +82,92 @@ export const ClientProvider: React.FC<{ children: React.ReactNode }> = ({
 
       if (job) {
         setActiveJob(job);
-        stopsStore.setIsStopSheetOpen(true);
+        setIsJobSheetOpen(true);
       } else {
-        stopsStore.setIsStopSheetOpen(false);
+        setIsJobSheetOpen(false);
+        setActiveJobData(null);
       }
     } else {
-      stopsStore.setIsStopSheetOpen(false);
+      setIsJobSheetOpen(false);
+      setActiveJobData(null);
     }
 
     setIsLoading(false);
   };
 
   const isJobActive = (id: string) => {
-    return stopsStore.activeLocation?.job.id === id;
+    return activeJobId === id;
   };
 
   const openJobEdit = (id: string) => {
     void setActiveJobId(id);
-    stopsStore.setActiveLocationById(id);
-    stopsStore.setIsStopSheetOpen(true);
+    setIsJobSheetOpen(true);
   };
 
   const openViewJob = (id: string | null) => {
     if (id) {
       void setActiveJobId(id);
-      stopsStore.setActiveLocationById(id);
     }
-    stopsStore.setIsFieldJobSheetOpen(true);
+    setIsFieldJobSheetOpen(true);
   };
 
   const onSheetOpenChange = (open: boolean) => {
     if (!open) void setActiveJobId(null);
-    stopsStore.setIsStopSheetOpen(open);
+    setIsJobSheetOpen(open);
   };
 
   const onFieldJobSheetOpen = (open: boolean) => {
     if (!open) void setActiveJobId(null);
-    stopsStore.setIsFieldJobSheetOpen(open);
+    setIsFieldJobSheetOpen(open);
   };
 
   const createNewJob = () => {
-    stopsStore.setJobSheetMode("create-new");
-    stopsStore.setActiveLocationById(null);
-    stopsStore.setIsStopSheetOpen(true);
+    setJobSheetMode("create-new");
+    setActiveJobIdState(null);
+    setActiveJobData(null);
+    setIsJobSheetOpen(true);
   };
 
   const addPreviousJob = () => {
-    stopsStore.setJobSheetMode("add-previous");
-    stopsStore.setActiveLocationById(null);
-    stopsStore.setIsStopSheetOpen(true);
+    setJobSheetMode("add-previous");
+    setActiveJobIdState(null);
+    setActiveJobData(null);
+    setIsJobSheetOpen(true);
   };
 
-  // useEffect(() => {
-  //   // Clean up active job when component unmounts
-  //   return () => {
-  //     void setActiveJobId(null);
-  //     stopsStore.setIsStopSheetOpen(false);
-  //     stopsStore.setIsFieldJobSheetOpen(false);
-  //   };
-  // }, []);
+  useEffect(() => {
+    // Clean up active job when component unmounts
+    return () => {
+      void setActiveJobId(null);
+      setIsJobSheetOpen(false);
+      setIsFieldJobSheetOpen(false);
+      setActiveJobData(null);
+    };
+  }, []);
 
   const value = {
-    activeJobId: stopsStore.activeLocation?.job.id ?? null,
+    activeJobId,
     setActiveJobId,
     isJobActive,
-    activeJobData: stopsStore.activeLocation,
+    activeJobData,
     isLoading,
     openJobEdit,
     openViewJob,
-    isJobSheetOpen: stopsStore.isStopSheetOpen,
-    setIsJobSheetOpen: stopsStore.setIsStopSheetOpen,
-    isFieldJobSheetOpen: stopsStore.isFieldJobSheetOpen,
-    setIsFieldJobSheetOpen: stopsStore.setIsFieldJobSheetOpen,
+    isJobSheetOpen,
+    setIsJobSheetOpen,
+    isFieldJobSheetOpen,
+    setIsFieldJobSheetOpen,
     onFieldJobSheetOpen,
-    jobSheetMode: stopsStore.jobSheetMode,
-    setJobSheetMode: stopsStore.setJobSheetMode,
+    jobSheetMode,
+    setJobSheetMode,
     createNewJob,
     addPreviousJob,
     onSheetOpenChange,
     findJobById,
     setActiveJob,
     routeJobs: getJobs.data ?? [],
+    selectedJobIds,
+    setSelectedJobIds,
   };
   return (
     <ClientContext.Provider value={value as ClientContextType}>

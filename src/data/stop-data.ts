@@ -1,15 +1,15 @@
-import { jobTypeSchema } from "~/types.wip";
 import { uniqueId } from "lodash";
 
 import type { ClientJobBundle } from "~/lib/validators/client-job";
-import type { UploadOptions } from "~/types.wip";
+import type { UploadOptions } from "~/types/misc";
 import { handleClientSheetUpload } from "~/utils/client-job/parse-clients.wip";
 import {
   militaryTimeToUnixSeconds,
   minutesToSeconds,
 } from "~/utils/generic/format-utils.wip";
+import { jobTypeSchema } from "~/lib/validators/client-job";
 
-interface IUploadOptions {
+type Props = {
   jobs: ClientJobBundle[];
   setJobs: ({
     jobs,
@@ -18,7 +18,7 @@ interface IUploadOptions {
     jobs: ClientJobBundle[];
     addToRoute?: boolean;
   }) => void;
-}
+};
 
 export const clientJobDataForNewLatLng = (
   lat: number,
@@ -65,7 +65,7 @@ export const clientJobDefaults = {
 export const clientJobUploadOptions = ({
   jobs,
   setJobs,
-}: IUploadOptions): UploadOptions<ClientJobBundle> => ({
+}: Props): UploadOptions<ClientJobBundle> => ({
   type: "job" as keyof ClientJobBundle,
   parseHandler: handleClientSheetUpload,
   handleAccept: ({ data }) => {

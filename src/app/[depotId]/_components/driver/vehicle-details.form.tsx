@@ -10,7 +10,6 @@ import { useAutoAnimate } from "@formkit/auto-animate/react";
 import type { DriverFormValues } from "~/lib/validators/driver-form";
 import { checkAndHighlightErrors } from "~/lib/helpers/highlight-errors";
 import { cn } from "~/lib/utils";
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
 import {
   AccordionContent,
   AccordionItem,

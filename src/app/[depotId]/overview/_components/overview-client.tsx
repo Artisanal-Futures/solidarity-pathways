@@ -2,9 +2,9 @@
 
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { useMediaQuery } from "~/hooks/use-media-query";
-import { AbsolutePageLoader } from "~/components/absolute-page-loader";
-import { AddNewDataPopover } from "~/components/layout/add-new-data-popover";
 import RouteLayout from "~/components/layout/route-layout";
+import { AbsolutePageLoader } from "~/components/other/absolute-page-loader";
+import { AddNewDataPopover } from "~/app/[depotId]/overview/_components/add-new-data-popover";
 
 import { DriverVehicleSheet } from "../../_components/driver/driver-vehicle-sheet";
 import { HomePageOnboardingCard } from "./homepage-onboarding-card.wip";

@@ -1,13 +1,11 @@
 "use client";
 
-import { Loader } from "./loader";
+import { ClipLoader } from "react-spinners";
 
-const PageLoader = () => {
+export const PageLoader = () => {
   return (
     <div className="my-auto flex h-full w-full items-center justify-center">
-      <Loader />
+      <ClipLoader color="#3498db" size={50} />
     </div>
   );
 };
-
-export default PageLoader;

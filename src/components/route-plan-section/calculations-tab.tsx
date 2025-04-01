@@ -1,3 +1,5 @@
+"use client";
+
 import type { OptimizedRoutePath } from "~/types/route";
 import { useRoutePlans } from "~/hooks/plans/use-route-plans";
 import {
@@ -11,17 +13,17 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { AssignedJobSheet } from "./assigned-job-sheet";
 import { UnassignedJobCard } from "./unassigned-job-card";
 
-const CalculationsTab = () => {
-  const routePlan = useRoutePlans();
+export const CalculationsTab = () => {
+  const { unassigned, optimized } = useRoutePlans();
 
-  const numberOfUnassigned = routePlan.unassigned.length;
-  const numberOfNotStarted = routePlan.optimized.filter(
+  const numberOfUnassigned = unassigned?.length;
+  const numberOfNotStarted = optimized.filter(
     (r) => r.status === "NOT_STARTED",
   ).length;
-  const numberOfInProgress = routePlan.optimized.filter(
+  const numberOfInProgress = optimized.filter(
     (r) => r.status === "IN_PROGRESS",
   ).length;
-  const numberOfCompleted = routePlan.optimized.filter(
+  const numberOfCompleted = optimized.filter(
     (r) => r.status === "COMPLETED",
   ).length;
 
@@ -32,7 +34,7 @@ const CalculationsTab = () => {
           <h2 className="scroll-m-20 text-xl font-semibold tracking-tight">
             Routes{" "}
             <span className="rounded-lg border border-slate-300 px-2">
-              {routePlan.data?.optimizedRoute?.length ?? 0}
+              {optimized?.length ?? 0}
             </span>
           </h2>
         </div>
@@ -45,9 +47,9 @@ const CalculationsTab = () => {
               Unassigned ({numberOfUnassigned})
             </AccordionTrigger>
             <AccordionContent>
-              {routePlan.unassigned &&
-                routePlan.unassigned?.length > 0 &&
-                routePlan.unassigned?.map((bundle) => {
+              {!!unassigned &&
+                unassigned?.length > 0 &&
+                unassigned?.map((bundle) => {
                   return (
                     <UnassignedJobCard
                       key={bundle.job.id}
@@ -66,9 +68,9 @@ const CalculationsTab = () => {
               Not Started ({numberOfNotStarted})
             </AccordionTrigger>
             <AccordionContent>
-              {routePlan.optimized && routePlan.optimized?.length > 0 && (
+              {!!optimized && optimized?.length > 0 && (
                 <>
-                  {routePlan.optimized?.map((route) => {
+                  {optimized?.map((route) => {
                     if (route.status === "NOT_STARTED")
                       return (
                         <AssignedJobSheet
@@ -86,9 +88,9 @@ const CalculationsTab = () => {
               In Progress ({numberOfInProgress})
             </AccordionTrigger>
             <AccordionContent>
-              {routePlan.optimized && routePlan.optimized?.length > 0 && (
+              {!!optimized && optimized?.length > 0 && (
                 <>
-                  {routePlan.optimized?.map((route) => {
+                  {optimized?.map((route) => {
                     if (route.status === "IN_PROGRESS")
                       return (
                         <AssignedJobSheet
@@ -106,9 +108,9 @@ const CalculationsTab = () => {
               Completed ({numberOfCompleted})
             </AccordionTrigger>
             <AccordionContent>
-              {routePlan.optimized && routePlan.optimized?.length > 0 && (
+              {!!optimized && optimized?.length > 0 && (
                 <>
-                  {routePlan.optimized?.map((route) => {
+                  {optimized?.map((route) => {
                     if (route.status === "COMPLETED")
                       return (
                         <AssignedJobSheet
@@ -126,5 +128,3 @@ const CalculationsTab = () => {
     </>
   );
 };
-
-export default CalculationsTab;

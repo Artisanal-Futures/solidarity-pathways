@@ -7,7 +7,7 @@ import { Controller } from "react-hook-form";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { JobType } from "@prisma/client";
 
-import type { StopFormValues } from "~/types.wip";
+import type { StopFormValues } from "~/lib/validators/stop";
 import { checkAndHighlightErrors } from "~/lib/helpers/highlight-errors";
 import { cn } from "~/lib/utils";
 import {

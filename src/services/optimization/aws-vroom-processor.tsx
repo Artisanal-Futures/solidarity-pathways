@@ -2,14 +2,14 @@ import axios from "axios";
 import { uniqueId } from "lodash";
 
 import { toastService } from "@dreamwalker-studios/toasts";
-import type { Polyline } from "~/types";
-import type {
-  ClientJobBundle,
-  DriverVehicleBundle,
-  OptimizedResponseData,
-} from "../../types.wip";
-import { formatGeometry } from "./aws-vroom/utils";
+
 import type { OptimizationProcessor } from "./optimization-processor";
+import type { ClientJobBundle } from "~/lib/validators/client-job";
+import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
+import type { Polyline } from "~/types/geolocation";
+import type { OptimizedResponseData } from "~/types/optimized";
+
+import { formatGeometry } from "./aws-vroom/utils";
 
 type VroomJob = {
   id: number;
@@ -158,7 +158,7 @@ export const awsVroomProcessor: OptimizationProcessor<
     const geometry = formatGeometry(data);
 
     return {
-      geometry: geometry as Polyline[],
+      geometry,
       data,
     };
   },

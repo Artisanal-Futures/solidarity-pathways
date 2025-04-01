@@ -1,16 +1,16 @@
-import { driverTypeSchema } from "~/types.wip";
+import { uniqueId } from "lodash";
+
+import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
+import type { UploadOptions } from "~/types/misc";
 import { handleDriverSheetUpload } from "~/utils/driver-vehicle/parse-drivers.wip";
 import {
   milesToMeters,
   militaryTimeToUnixSeconds,
   minutesToSeconds,
 } from "~/utils/generic/format-utils.wip";
-import { uniqueId } from "lodash";
+import { driverTypeSchema } from "~/lib/validators/driver-vehicle";
 
-import type { UploadOptions } from "~/types.wip";
-import { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
-
-interface IUploadOptions {
+type Props = {
   drivers: DriverVehicleBundle[];
   setDrivers: ({
     drivers,
@@ -19,7 +19,7 @@ interface IUploadOptions {
     drivers: DriverVehicleBundle[];
     addToRoute?: boolean;
   }) => void;
-}
+};
 
 export const driverVehicleDataForNewLatLng = (
   lat: number,
@@ -88,7 +88,7 @@ export const driverVehicleDefaults = {
 export const driverVehicleUploadOptions = ({
   drivers,
   setDrivers,
-}: IUploadOptions): UploadOptions<DriverVehicleBundle> => ({
+}: Props): UploadOptions<DriverVehicleBundle> => ({
   type: "driver" as keyof DriverVehicleBundle,
   parseHandler: handleDriverSheetUpload,
   handleAccept: ({ data }) => {

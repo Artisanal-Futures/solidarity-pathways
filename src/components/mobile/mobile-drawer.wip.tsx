@@ -10,19 +10,17 @@ import {
   ThumbsUpIcon,
 } from "lucide-react";
 
-import { toastService } from "@dreamwalker-studios/toasts";
 import { RouteStatus } from "@prisma/client";
 
-import type { OptimizedStop } from "../../types.wip";
-import type { EditStopFormValues } from "~/lib/validators/route-plan";
+import type { Address } from "~/types/geolocation";
+import type { Client, Job } from "~/types/job";
 import { cn } from "~/lib/utils";
-import { api } from "~/trpc/react"; // ?
-
+import { api } from "~/trpc/react";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import { Button } from "~/components/ui/button";
 
-import { useOptimizedRoutePlan } from "../../hooks/optimized-data/use-optimized-route-plan";
-
+type Status = "complete" | "failed";
 export const MobileDrawer = () => {
   const {
     flyToDriver,
@@ -31,6 +29,10 @@ export const MobileDrawer = () => {
     setConstantTracking,
     locationMessage, // use-map.tsx uses setLocationMessage
   } = useMapStore();
+
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["routePlan", "job", "vehicle"],
+  });
 
   const toggleFlyToTimer = () => {
     console.log("Should be changing the button text!");
@@ -41,35 +43,28 @@ export const MobileDrawer = () => {
     setConstantTracking(!constantTracking);
   };
 
-  const optimizedRoutePlan = useOptimizedRoutePlan();
+  const updateRoutePathStatus =
+    api.routePlan.updateOptimizedPath.useMutation(defaultActions);
 
-  const apiContext = api.useUtils();
-
-  const updateStopStatus = api.routePlan.updateOptimizedStopState.useMutation({
-    onSuccess: ({ message }) => toastService.success(message),
-    onError: (error) =>
-      toastService.error({
-        message:
-          error?.message ?? "There was an issue updating the stop status.",
-        error,
-      }),
+  const updateStopStatus = api.routePlan.updateOptimizedStop.useMutation({
+    ...defaultActions,
     onSettled: () => {
+      defaultActions.onSettled();
       onFieldJobSheetOpen(false);
-      void apiContext.routePlan.invalidate();
     },
   });
-
-  const { data: routePlan } = useOptimizedRoutePlan();
+  const { routeId, pathId } = useSolidarityState();
+  const getOptimizedData = api.routePlan.getOptimized.useQuery(pathId, {
+    enabled: !!pathId,
+  });
 
   const { onFieldJobSheetOpen } = useClient();
-  const { routeId } = useSolidarityState();
 
-  const getRouteJobs = api.routePlan.getJobBundles.useQuery(
-    { routeId },
-    { enabled: !!routeId },
-  );
+  const getRouteJobs = api.job.getBundles.useQuery(routeId, {
+    enabled: !!routeId,
+  });
 
-  const jobsForRoute = routePlan?.stops
+  const jobsForRoute = getOptimizedData?.data?.stops
     .map((stop) => {
       const jobBundle = getRouteJobs.data?.find(
         (jobBundle) => jobBundle.job.id === stop.jobId,
@@ -110,8 +105,7 @@ export const MobileDrawer = () => {
   const [carouselIndex, setCarouselIndex] = useState(0); // To track the current index of the carousel
 
   // Assuming `route?.stops` is an array of stops for the route
-  const route = optimizedRoutePlan?.data;
-  const totalStops = route?.stops?.length ?? 0; // Total number of stops
+  const totalStops = getOptimizedData?.data?.stops?.length ?? 0; // Total number of stops
 
   // Function to move to the next stop
   const nextStop = () => {
@@ -126,30 +120,30 @@ export const MobileDrawer = () => {
     setCarouselIndex((carouselIndex - 1 + totalStops) % totalStops);
   };
 
-  const [selectedButton, setSelectedButton] = useState<
-    Record<number, "complete" | "failed">
-  >({});
+  const [selectedButton, setSelectedButton] = useState<Record<number, Status>>(
+    {},
+  );
 
-  const onSubmit = (
-    status: "COMPLETED" | "FAILED" | "PENDING",
-    activeStop: OptimizedStop,
-  ) => {
-    const data: Partial<EditStopFormValues> = {
-      status: status,
-      deliveryNotes: activeStop?.notes ?? undefined,
-    };
-
-    if (activeStop) {
+  const onSubmit = ({
+    status,
+    notes,
+    stopId,
+  }: {
+    status: "COMPLETED" | "FAILED" | "PENDING";
+    notes?: string;
+    stopId?: string | null;
+  }) => {
+    if (stopId) {
       updateStopStatus.mutate({
         state: status,
-        stopId: activeStop.id,
-        notes: data.deliveryNotes,
+        stopId,
+        notes,
       });
     }
   };
 
   const renderCarouselContent = () => {
-    const activeStop = routePlan?.stops[carouselIndex];
+    const activeStop = getOptimizedData?.data?.stops[carouselIndex];
     const handleStopUpdate = (status: "COMPLETED" | "FAILED") => {
       if (activeStop?.jobId) {
         console.log(`Updating stop ${activeStop.jobId} to ${status}`);
@@ -161,14 +155,22 @@ export const MobileDrawer = () => {
           const newStatus = status === "COMPLETED" ? "complete" : "failed";
           if (currentStatus === newStatus) {
             // If the status is the same as its prevState, set status to PENDING
-            onSubmit("PENDING", { ...activeStop, job });
+            onSubmit({
+              status: "PENDING",
+              stopId: activeStop.id,
+              notes: activeStop.notes ?? undefined,
+            });
             setSelectedButton((prevState) => ({
               ...prevState,
-              [carouselIndex]: "pending",
+              [carouselIndex]: "pending" as Status,
             }));
           } else {
             // If the status is different, proceed with the update
-            onSubmit(status, { ...activeStop, job });
+            onSubmit({
+              status,
+              stopId: activeStop.id,
+              notes: activeStop.notes ?? undefined,
+            });
             // Update the selectedButton state for the current stop
             setSelectedButton((prevState) => ({
               ...prevState,
@@ -207,9 +209,9 @@ export const MobileDrawer = () => {
               className="w-full"
               onClick={(e) => {
                 e.preventDefault();
-                if (optimizedRoutePlan?.data?.id) {
-                  optimizedRoutePlan.updateRoutePathStatus({
-                    pathId: optimizedRoutePlan.data.id,
+                if (getOptimizedData?.data?.id) {
+                  updateRoutePathStatus.mutate({
+                    pathId: getOptimizedData?.data?.id,
                     state: RouteStatus.IN_PROGRESS,
                   });
                   setTimeout(() => nextStop(), 500);
@@ -227,18 +229,14 @@ export const MobileDrawer = () => {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                if (optimizedRoutePlan?.data?.id) {
-                  optimizedRoutePlan.updateRoutePathStatus({
-                    pathId: optimizedRoutePlan.data.id,
+                if (getOptimizedData?.data?.id) {
+                  updateRoutePathStatus.mutate({
+                    pathId: getOptimizedData?.data?.id,
                     state: RouteStatus.COMPLETED,
                   });
                 }
               }}
-              style={{
-                color: "blue",
-                textDecoration: "underline",
-                cursor: "pointer",
-              }}
+              className="cursor-pointer text-blue-500 underline"
             >
               Complete route
             </a>
@@ -281,7 +279,7 @@ export const MobileDrawer = () => {
   };
 
   // const renderStopAddress = () => {
-  //   const activeStop = routePlan?.stops[carouselIndex];
+  //   const activeStop =getOptimizedData?.data?.stops[carouselIndex];
 
   //   let stopDetails = <div>Address not available</div>;
   //   if (activeStop?.jobId) {
@@ -314,18 +312,23 @@ export const MobileDrawer = () => {
   // }
 
   const renderStopAddress = () => {
-    const activeStop = routePlan?.stops[carouselIndex];
+    const activeStop = getOptimizedData?.data?.stops[carouselIndex];
 
     let stopDetails = <div>Address not available</div>;
     if (activeStop?.jobId) {
-      const job = jobsForRoute?.find((job) => job.id === activeStop.jobId);
+      const job = jobsForRoute?.find(
+        (job) => job.id === activeStop.jobId,
+      ) as Job & {
+        client: Client;
+        address: Address;
+      };
       if (job) {
-        const clientName = job.client?.name;
+        const clientName = job?.client?.name;
 
         const address =
           job.address.formatted.split(",")[0] ?? "Address not available";
 
-        const handleAddressClick = (e) => {
+        const handleAddressClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
           e.preventDefault();
           const encodedAddress = encodeURIComponent(address + "Detroit, MI");
           const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
@@ -335,12 +338,12 @@ export const MobileDrawer = () => {
 
         stopDetails = clientName ? (
           <>
-            <div style={{ fontSize: "larger" }}>{clientName}</div>
-            <div style={{ fontSize: "smaller" }}>
+            <div className="text-lg">{clientName}</div>
+            <div className="text-sm">
               <a
                 href="#"
                 onClick={handleAddressClick}
-                style={{ color: "inherit", textDecoration: "underline" }}
+                className="text-inherit underline"
               >
                 {address}
               </a>
@@ -351,7 +354,7 @@ export const MobileDrawer = () => {
             <a
               href="#"
               onClick={handleAddressClick}
-              style={{ color: "inherit", textDecoration: "underline" }}
+              className="text-inherit underline"
             >
               {address}
             </a>
@@ -359,42 +362,21 @@ export const MobileDrawer = () => {
         );
       }
     } else {
-      stopDetails = "";
+      stopDetails = <></>;
     }
 
     return <div>{stopDetails}</div>;
   };
 
-  // const renderStopAddress = () => {
-  //   const activeStop = routePlan?.stops[carouselIndex]
-
-  //   let stopAddress = "Address not available";
-  //   if (activeStop?.jobId) {
-  //     const job = jobsForRoute.find((job) => job.id === activeStop.jobId);
-  //     if (job) {
-  //       stopAddress = job.address.formatted.split(',')[0] ?? "Address not available";
-  //     }
-  //   }
-  //   else {
-  //     stopAddress = activeStop?.type ?? "Stop type not available";
-  //   }
-
-  //   return (
-  //     <div>
-  //       {stopAddress}
-  //     </div>
-  //   )
-  // }
-
   return (
     <>
       {/* Driver top pane */}
-      <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
+      <div className="flex w-full flex-col">
         {/* Address pane */}
         <section className="flex flex-1 flex-col max-md:h-full lg:flex-row">
           <div className="flex w-full">
             {/* Column 1 - 10% width */}
-            <div className="flex-1" style={{ flexBasis: "10%" }}>
+            <div className="flex-1 basis-[10%]">
               <Button
                 className={cn(
                   locationMessage.error && "bg-red-150",
@@ -410,18 +392,12 @@ export const MobileDrawer = () => {
             </div>
 
             {/* Column 2 - 40% width */}
-            <div
-              className="flex items-center justify-center"
-              style={{ flexBasis: "80%" }}
-            >
+            <div className="flex basis-[80%] items-center justify-center">
               {renderStopAddress()}
             </div>
 
             {/* Column 3 - 10% width */}
-            <div
-              className="flex items-center justify-end"
-              style={{ flexBasis: "10%" }}
-            >
+            <div className="flex basis-[10%] items-center justify-end">
               <Button onClick={toggleFlyToTimer}>
                 {flyToDriver ? <LocateFixedIcon /> : <LocateOffIcon />}
               </Button>
@@ -434,7 +410,7 @@ export const MobileDrawer = () => {
         <section className="flex flex-1 flex-col max-md:h-full lg:flex-row">
           <div className="flex w-full">
             {/* Column 1 - 10% width */}
-            <div className="flex-1" style={{ flexBasis: "10%" }}>
+            <div className="flex-1 basis-[10%]">
               <Button size={"lg"} variant="ghost">
                 <ChevronLeftIcon
                   onClick={prevStop}
@@ -444,18 +420,12 @@ export const MobileDrawer = () => {
             </div>
 
             {/* Column 2 - 40% width */}
-            <div
-              className="flex items-center justify-center"
-              style={{ flexBasis: "80%" }}
-            >
+            <div className="flex basis-[80%] items-center justify-center">
               {renderCarouselContent()}
             </div>
 
             {/* Column 3 - 10% width */}
-            <div
-              className="flex items-center justify-end"
-              style={{ flexBasis: "10%" }}
-            >
+            <div className="flex basis-[10%] items-center justify-end">
               <Button size={"lg"} variant="ghost">
                 <ChevronRightIcon
                   onClick={nextStop}

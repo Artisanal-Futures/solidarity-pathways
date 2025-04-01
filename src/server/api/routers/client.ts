@@ -1,10 +1,7 @@
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { z } from "zod";
 
-import { TRPCError } from "@trpc/server";
-
-import type { ClientJobBundle } from "~/lib/validators/client-job";
-import { clientSchema, newClientJobSchema } from "~/lib/validators/client-job";
+import { clientSchema } from "~/lib/validators/client-job";
 
 export const clientRouterAlt = createTRPCRouter({
   update: protectedProcedure
@@ -49,7 +46,7 @@ export const clientRouterAlt = createTRPCRouter({
         },
       });
 
-      return clients;
+      return clients ?? [];
     }),
 
   deleteAllFromDepot: protectedProcedure

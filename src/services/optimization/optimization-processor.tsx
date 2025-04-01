@@ -1,8 +1,6 @@
-import type {
-  ClientJobBundle,
-  DriverVehicleBundle,
-  OptimizedResponseData,
-} from "../../types.wip";
+import type { ClientJobBundle } from "~/lib/validators/client-job";
+import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
+import type { OptimizedResponseData } from "~/types/optimized";
 
 export interface OptimizationProcessor<T, Data, Drivers, Jobs, ResponseData> {
   calculateOptimalPaths(data: T): Promise<Data>;
@@ -19,7 +17,7 @@ export class OptimizationService<T, Data, Drivers, Jobs, ResponseData> {
       Drivers,
       Jobs,
       ResponseData
-    >
+    >,
   ) {}
 
   async calculateOptimalPaths(data: T): Promise<Data> {

@@ -8,7 +8,6 @@ type DepotContextType = {
   routeId: string | null;
   pathId: string | null;
   routeDate: string | null;
-  isUserAllowedToSaveToDepot: boolean;
 };
 
 const DepotContext = createContext<DepotContextType | undefined>(undefined);
@@ -21,8 +20,6 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({
   const [routeId, setRouteId] = useState<string | null>(null);
   const [pathId, setPathId] = useState<string | null>(null);
   const [routeDate, setRouteDate] = useState<string | null>(null);
-  const [isUserAllowedToSaveToDepot, setIsUserAllowedToSaveToDepot] =
-    useState<boolean>(true);
 
   useEffect(() => {
     if (!pathname) return;
@@ -62,7 +59,6 @@ export const DepotProvider: React.FC<{ children: React.ReactNode }> = ({
     routeId,
     pathId,
     routeDate,
-    isUserAllowedToSaveToDepot,
   };
 
   return (

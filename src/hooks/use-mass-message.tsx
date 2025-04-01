@@ -1,3 +1,5 @@
+"use client";
+
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/prefer-promise-reject-errors */
 import { useState } from "react";
@@ -6,17 +8,20 @@ import axios from "axios";
 
 import type { PromiseMessage } from "~/services/notification/types";
 import { env } from "~/env";
+import { api } from "~/trpc/react";
 
 import { generateDriverPassCode } from "../utils/server/auth-driver-passcode";
 import { useDepot } from "./depot/use-depot";
 import { useSolidarityState } from "./optimized-data/use-solidarity-state";
-import { useRoutePlans } from "./plans/use-route-plans";
 
 export const useMassMessage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { depotId, routeId, pathId } = useSolidarityState();
   const { currentDepot } = useDepot();
-  const { getRoutePlanData } = useRoutePlans();
+
+  const getRoutePlanData = api.routePlan.get.useQuery(routeId, {
+    enabled: false,
+  });
 
   const optimized = getRoutePlanData.data?.optimizedRoute ?? [];
 

@@ -1,21 +1,20 @@
 import { useState } from "react";
-import { stopFormSchema } from "~/types.wip";
 import { uniqueId } from "lodash";
 import { Pencil } from "lucide-react";
-import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import type { ClientJobBundle } from "~/lib/validators/client-job";
 import type { StopFormValues } from "~/lib/validators/stop";
-import type { Coordinates } from "~/types/geolocation";
+import type { Address } from "~/types/geolocation";
 import { formatJobFormDataToBundle } from "~/utils/client-job/format-clients.wip";
 import {
   secondsToMinutes,
   unixSecondsToMilitaryTime,
 } from "~/utils/generic/format-utils.wip";
 import { cn } from "~/lib/utils";
+import { stopFormSchema } from "~/lib/validators/stop";
 import { api } from "~/trpc/react";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
@@ -23,6 +22,7 @@ import { Accordion } from "~/components/ui/accordion";
 import { Button } from "~/components/ui/button";
 import { Form } from "~/components/ui/form";
 import { DeleteDialog } from "~/components/delete-dialog";
+import { LoadButton } from "~/components/shared/load-button";
 
 import { ClientDetailsSection } from "./client-detail-form";
 import { StopDetailsSection } from "./job-details-form";
@@ -34,9 +34,9 @@ type Props = {
 
 export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
   const [editClient, setEditClient] = useState(false);
-  const { status } = useSession();
-
-  const [, setAccordionValue] = useState(activeLocation ? "item-2" : "item-1");
+  const [accordionValue, setAccordionValue] = useState<string>(
+    activeLocation ? "item-2" : "item-1",
+  );
 
   const { defaultActions } = useDefaultMutationActions({
     invalidateEntities: ["job", "routePlan"],
@@ -44,17 +44,13 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
   const { routeId, depotId } = useSolidarityState();
 
   const updateJob = api.job.update.useMutation(defaultActions);
-
   const updateClient = api.customer.update.useMutation(defaultActions);
-
-  const createJobBundles = api.job.createMany.useMutation(defaultActions);
-
+  const createJob = api.job.create.useMutation(defaultActions);
   const deleteJobFromRoute = api.job.delete.useMutation(defaultActions);
 
   const defaultValues: Partial<StopFormValues> = {
     id: activeLocation?.job.id ?? uniqueId("job_"),
     clientId: activeLocation?.client?.id ?? undefined,
-
     addressId: activeLocation?.job.addressId ?? uniqueId("address_"),
     clientAddressId: activeLocation?.client?.addressId ?? undefined,
 
@@ -63,10 +59,10 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
     name: activeLocation?.client?.name ?? `Job #${activeLocation?.job.id}`,
 
     address: {
-      formatted: activeLocation?.job.address.formatted ?? "",
+      formatted: activeLocation?.job.address.formatted ?? undefined,
       latitude: activeLocation?.job.address.latitude ?? undefined,
       longitude: activeLocation?.job.address.longitude ?? undefined,
-    } as Coordinates & { formatted: string },
+    } as Address,
 
     clientAddress: {
       formatted:
@@ -78,21 +74,14 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
       longitude:
         activeLocation?.client?.address?.longitude ??
         activeLocation?.job.address.longitude,
-    } as Coordinates & { formatted: string },
+    } as Address,
 
-    timeWindowStart: activeLocation?.job.timeWindowStart
-      ? unixSecondsToMilitaryTime(activeLocation?.job.timeWindowStart)
-      : "09:00",
-    timeWindowEnd: activeLocation?.job.timeWindowEnd
-      ? unixSecondsToMilitaryTime(activeLocation?.job.timeWindowEnd)
-      : "17:00",
-
-    serviceTime: activeLocation?.job.serviceTime
-      ? secondsToMinutes(activeLocation.job.serviceTime)
-      : 5,
-    prepTime: activeLocation?.job.prepTime
-      ? secondsToMinutes(activeLocation.job.prepTime)
-      : 5,
+    timeWindowStart:
+      unixSecondsToMilitaryTime(activeLocation?.job.timeWindowStart) ?? "09:00",
+    timeWindowEnd:
+      unixSecondsToMilitaryTime(activeLocation?.job.timeWindowEnd) ?? "17:00",
+    serviceTime: secondsToMinutes(activeLocation?.job.serviceTime) ?? 5,
+    prepTime: secondsToMinutes(activeLocation?.job.prepTime) ?? 5,
 
     priority: activeLocation?.job.priority ?? 1,
     email: activeLocation?.client?.email ?? undefined,
@@ -109,13 +98,11 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
     const jobBundle = formatJobFormDataToBundle(data);
 
     if (!activeLocation) {
-      await createJobBundles.mutateAsync({
-        bundles: [
-          {
-            job: jobBundle.job,
-            client: jobBundle.client?.email ? jobBundle.client : undefined,
-          },
-        ],
+      await createJob.mutateAsync({
+        bundle: {
+          job: jobBundle.job,
+          client: jobBundle.client?.email ? jobBundle.client : undefined,
+        },
         depotId,
         routeId,
       });
@@ -123,18 +110,11 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
       return;
     }
 
-    await updateJob.mutateAsync({
-      job: jobBundle.job,
-      routeId,
-    });
+    await updateJob.mutateAsync({ job: jobBundle.job, routeId });
 
     if (editClient && data?.clientId && !data?.clientId.includes("client_")) {
       if (!jobBundle.client) throw new Error("No client was found");
-
-      await updateClient.mutateAsync({
-        depotId,
-        client: jobBundle.client,
-      });
+      await updateClient.mutateAsync({ depotId, client: jobBundle.client });
     }
 
     handleOnOpenChange(false);
@@ -152,12 +132,16 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
           onSubmit={(e) => void form.handleSubmit(onSubmit)(e)}
           className="flex h-full max-h-[calc(100vh-50vh)] w-full flex-col space-y-8 md:h-[calc(100vh-15vh)] lg:flex-grow"
         >
-          {activeLocation && (
+          {!!activeLocation && (
             <div className="flex w-full flex-col gap-3 border-b bg-white p-4">
               <div className="flex items-center justify-between gap-3">
-                <Button type="submit" className="flex-1">
-                  {activeLocation ? "Update" : "Add"} stop
-                </Button>
+                <LoadButton
+                  type="submit"
+                  className="flex-1"
+                  isLoading={updateJob.isPending || updateClient.isPending}
+                >
+                  Update stop
+                </LoadButton>
 
                 <DeleteDialog onConfirm={onDelete} />
               </div>
@@ -167,15 +151,13 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
           {!activeLocation && (
             <div className="flex w-full flex-col gap-3 border-b bg-white p-4">
               <div className="flex items-center justify-between gap-3">
-                {status === "authenticated" && (
-                  <Button type="submit" className="flex-1" variant={"outline"}>
-                    Save stop to depot
-                  </Button>
-                )}
-
-                <Button type="submit" className="flex-1">
+                <LoadButton
+                  type="submit"
+                  className="flex-1"
+                  isLoading={createJob.isPending}
+                >
                   Add stop
-                </Button>
+                </LoadButton>
               </div>
             </div>
           )}
@@ -186,6 +168,10 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
               collapsible
               className="w-full px-4"
               defaultValue="item-1"
+              value={accordionValue}
+              onValueChange={(value) => {
+                setAccordionValue(value);
+              }}
             >
               <StopDetailsSection form={form} />
 
@@ -206,7 +192,7 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
               )}
               onClick={() => {
                 setEditClient((prev) => !prev);
-                setAccordionValue("item-1");
+                setAccordionValue("item-2");
               }}
             >
               <Pencil className="h-4 w-4" />

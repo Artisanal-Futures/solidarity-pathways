@@ -1,16 +1,20 @@
+import { clientJobDataForNewLatLng } from "~/data/stop-data";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { clientJobSchema, clientSchema, jobSchema } from "~/types.wip";
 import { z } from "zod";
 
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
-import type { ClientJobBundle } from "~/lib/validators/client-job";
-import { newClientJobSchema } from "~/lib/validators/client-job";
+import type {
+  ClientJobBundle,
+  NewClientJobBundle,
+} from "~/lib/validators/client-job";
+import { jobSchema, newClientJobSchema } from "~/lib/validators/client-job";
 
 export const jobRouter = createTRPCRouter({
   // Batch create jobs (and possibly clients) for a route
 
-  getAllFromRoute: protectedProcedure
+  getBundles: protectedProcedure
     .input(z.string())
     .query(async ({ ctx, input: routeId }) => {
       const data = await ctx.db.job.findMany({
@@ -25,9 +29,10 @@ export const jobRouter = createTRPCRouter({
         job: job,
       })) as ClientJobBundle[];
 
-      return bundles;
+      return bundles ?? [];
     }),
-  getById: protectedProcedure
+
+  getBundleById: protectedProcedure
     .input(z.object({ jobId: z.string(), routeId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const data = await ctx.db.job.findFirst({
@@ -91,49 +96,14 @@ export const jobRouter = createTRPCRouter({
 
       const res = await Promise.all(
         bundlesWithClients.map(async (clientJob) => {
-          // Then create the job itself
-
-          const { address, ...jobData } = clientJob.job;
-          const { ...clientData } = clientJob.client;
-
-          const job = await ctx.db.job.create({
-            data: {
-              depotId: input.depotId,
-              routeId: route?.id ?? input.routeId,
-              address: { create: { ...address } },
-              ...jobData,
-            },
-            include: { address: true },
+          const job = await createJob({
+            db: ctx.db,
+            clientJob,
+            depotId: input.depotId,
+            routeId: route?.id ?? input.routeId,
           });
 
-          /**  TODO: So I don't remember why we are not setting this as the client address.
-               Maybe it is because the client address and job address would be the same in most instances?*/
-          const addressOfClient = clientJob?.job?.address
-            ? await ctx.db.address.create({ data: { ...address } })
-            : { id: undefined };
-
-          // Next, check if client exists via email. If it does, assume updated info,
-          // otherwise create a new client and link with new job
-          // If no client info is provided, just create the job
-          const client = clientJob?.client
-            ? await ctx.db.client.upsert({
-                where: { email: clientJob.client.email },
-                update: {},
-                create: {
-                  ...clientData,
-                  address: { connect: { id: addressOfClient.id } },
-                  depotId: input.depotId,
-                },
-                include: { address: true },
-              })
-            : { id: undefined };
-
-          await ctx.db.job.update({
-            where: { id: job.id },
-            data: { clientId: client.id },
-          });
-
-          return { client, job } as ClientJobBundle;
+          return job;
         }),
       );
 
@@ -141,6 +111,59 @@ export const jobRouter = createTRPCRouter({
         data: res,
         route: route?.id ?? input.routeId,
         message: "Jobs were successfully added to route.",
+      };
+    }),
+
+  createByLatLng: protectedProcedure
+    .input(
+      z.object({
+        latitude: z.number(),
+        longitude: z.number(),
+        depotId: z.string(),
+        routeId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const clientJob = clientJobDataForNewLatLng(
+        input.latitude,
+        input.longitude,
+      );
+
+      const job = await createJob({
+        db: ctx.db,
+        clientJob: {
+          job: clientJob.job,
+          client: clientJob.client?.email ? clientJob.client : undefined,
+        },
+        depotId: input.depotId,
+        routeId: input.routeId,
+      });
+
+      return {
+        data: job,
+        message: "Job was successfully created via lat/lng.",
+      };
+    }),
+
+  create: protectedProcedure
+    .input(
+      z.object({
+        bundle: newClientJobSchema,
+        depotId: z.string(),
+        routeId: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const job = await createJob({
+        db: ctx.db,
+        clientJob: input.bundle,
+        depotId: input.depotId,
+        routeId: input.routeId,
+      });
+
+      return {
+        data: job,
+        message: "Job was successfully created.",
       };
     }),
 
@@ -317,3 +340,57 @@ export const jobRouter = createTRPCRouter({
       return jobs;
     }),
 });
+
+const createJob = async ({
+  db,
+  clientJob,
+  depotId,
+  routeId,
+}: {
+  db: PrismaClient;
+  clientJob: NewClientJobBundle;
+  depotId: string;
+  routeId: string | undefined;
+}) => {
+  const { address, ...jobData } = clientJob.job;
+  const { ...clientData } = clientJob.client;
+
+  const job = await db.job.create({
+    data: {
+      depotId,
+      routeId,
+      address: { create: { ...address } },
+      ...jobData,
+    },
+    include: { address: true },
+  });
+
+  /**  TODO: So I don't remember why we are not setting this as the client address.
+           Maybe it is because the client address and job address would be the same in most instances?*/
+  const addressOfClient = clientJob?.job?.address
+    ? await db.address.create({ data: { ...address } })
+    : { id: undefined };
+
+  // Next, check if client exists via email. If it does, assume updated info,
+  // otherwise create a new client and link with new job
+  // If no client info is provided, just create the job
+  const client = clientJob?.client
+    ? await db.client.upsert({
+        where: { email: clientJob.client.email },
+        update: {},
+        create: {
+          ...clientData,
+          address: { connect: { id: addressOfClient.id } },
+          depotId,
+        },
+        include: { address: true },
+      })
+    : { id: undefined };
+
+  await db.job.update({
+    where: { id: job.id },
+    data: { clientId: client.id },
+  });
+
+  return { client, job } as ClientJobBundle;
+};

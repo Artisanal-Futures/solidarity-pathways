@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-import * as React from "react";
+
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 
 import type { Address } from "@prisma/client";
 import type { ColumnDef } from "@tanstack/react-table";
 
-import type { ClientJobBundle } from "~/types.wip";
+import type { ClientJobBundle } from "~/lib/validators/client-job";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
@@ -18,7 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { DataEditOption } from "~/app/_components/data-sheet/data-edit-option";
+import { DataEditOption } from "~/components/shared/data-sheet/data-edit-option";
 
 export const jobDepotColumns: ColumnDef<ClientJobBundle>[] = [
   {

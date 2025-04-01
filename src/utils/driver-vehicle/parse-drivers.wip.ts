@@ -1,9 +1,8 @@
 import geocodingService from "~/services/autocomplete";
-import type {
-  DriverVehicleBundle,
-  FileUploadHandler,
-  VersionOneDriverCSV,
-} from "~/types.wip";
+
+import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
+import type { FileUploadHandler } from "~/types/misc";
+import type { VersionOneDriverCSV } from "~/types/parsing";
 import { formatDriverSheetRowToBundle } from "~/utils/driver-vehicle/format-drivers.wip";
 import { parseSpreadSheet } from "~/utils/generic/parse-csv.wip";
 

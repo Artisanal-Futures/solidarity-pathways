@@ -1,3 +1,6 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unused-expressions */
 import type { LatLngExpression, Map } from "leaflet";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatGeometryString } from "~/services/optimization/aws-vroom/utils";
@@ -5,10 +8,10 @@ import { useMapStore } from "~/stores/use-map-store";
 import axios from "axios";
 import L from "leaflet";
 
-import type { Coordinates } from "~/types";
-import { getCurrentLocation } from "~/utils/get-current-location";
-import { ClientJobBundle } from "~/lib/validators/client-job";
-import { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
+import type { ClientJobBundle } from "~/lib/validators/client-job";
+import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
+import type { Coordinates } from "~/types/geolocation";
+import { getCurrentLocation } from "~/lib/helpers/get-current-location";
 import { api } from "~/trpc/react";
 
 import { useOptimizedRoutePlan } from "./optimized-data/use-optimized-route-plan";
@@ -32,7 +35,7 @@ const useMap = ({
   mapRef,
   activeDriverData,
   activeJobData,
-  driverEnabled = true, //false, // was false
+
   constantUserTracking = true, //false, // was false
 }: TUseMapProps) => {
   const [initial, setInitial] = useState(true);
@@ -42,10 +45,9 @@ const useMap = ({
   const [isSimulatingGPS, setIsSimulatingGPS] = useState(false);
 
   const { pathId, routeId } = useSolidarityState();
-  const getRouteJobs = api.routePlan.getJobBundles.useQuery(
-    { routeId },
-    { enabled: !!routeId },
-  );
+  const getRouteJobs = api.job.getBundles.useQuery(routeId, {
+    enabled: !!routeId,
+  });
 
   const {
     flyToDriver,
@@ -58,10 +60,9 @@ const useMap = ({
 
   // const { active: activeJob } = useClientJobBundles();
 
-  const getRouteVehicles = api.routePlan.getVehicleBundles.useQuery(
-    { routeId: routeId },
-    { enabled: !!routeId },
-  );
+  const getRouteVehicles = api.vehicle.getBundles.useQuery(routeId, {
+    enabled: !!routeId,
+  });
 
   const optimizedRoutePlan = useOptimizedRoutePlan();
 
@@ -74,10 +75,10 @@ const useMap = ({
   )?.geoJson;
 
   const currentCoordinateIndexRef = useRef(0);
-  const matchedPlanLatLng = useRef([]);
+  const matchedPlanLatLng = useRef<[number, number][]>([]);
 
   if (matchedGeoJson) {
-    const geoJson = formatGeometryString(matchedGeoJson, vehicleId);
+    const geoJson = formatGeometryString(matchedGeoJson, vehicleId!);
     matchedPlanLatLng.current = geoJson.coordinates;
   } else {
     //if(driverId) console.error(`Error: No matching plan found for vehicleId: ${vehicleId}`);
@@ -120,11 +121,12 @@ const useMap = ({
             matchedPlanLatLng.current.length;
 
           matchedPlanLatLng.current.length;
-
           useThisLatitude =
-            matchedPlanLatLng.current[currentCoordinateIndexRef.current][1];
+            matchedPlanLatLng.current[currentCoordinateIndexRef.current]?.[1] ??
+            0;
           useThisLongitude =
-            matchedPlanLatLng.current[currentCoordinateIndexRef.current][0];
+            matchedPlanLatLng.current[currentCoordinateIndexRef.current]?.[0] ??
+            0;
           useThisAccuracy = 1;
 
           locationMessage.error = false;
@@ -137,13 +139,15 @@ const useMap = ({
             matchedPlanLatLng.current.length,
           );
         } else {
-          getCurrentLocation(setCurrentLocation, setLocationMessage);
+          getCurrentLocation({
+            success: setCurrentLocation,
+            setLocationMessage,
+          });
         }
-
         if (!isSimulatingGPS) {
-          useThisLatitude = currentLocation.latitude;
-          useThisLongitude = currentLocation.longitude;
-          useThisAccuracy = currentLocation.accuracy;
+          useThisLatitude = currentLocation.latitude ?? 0;
+          useThisLongitude = currentLocation.longitude ?? 0;
+          useThisAccuracy = currentLocation.accuracy ?? 0;
         } else {
           // update currentLocation so that other features can use it
           setCurrentLocation({
@@ -220,7 +224,7 @@ const useMap = ({
     [mapRef],
   );
 
-  const flyToCurrentLocation = (zoom: number = 8) => {
+  const flyToCurrentLocation = (zoom = 8) => {
     if (currentLocation)
       flyTo(
         {
@@ -260,9 +264,23 @@ const useMap = ({
                 location.job.address.longitude,
               ] as LatLngExpression,
           );
-      const bounds = L.latLngBounds([...driverBounds, ...locationBounds]);
 
-      mapRef.fitBounds(bounds);
+      // Create arrays from the bounds, ensuring they're not undefined
+      const driverBoundsArray = driverBounds ? [...driverBounds] : [];
+      const locationBoundsArray = locationBounds ? [...locationBounds] : [];
+
+      // Combine the arrays and create a bounds object
+      const allBounds = [...driverBoundsArray, ...locationBoundsArray];
+      const bounds = allBounds.length > 0 ? L.latLngBounds(allBounds) : null;
+
+      // Only fit bounds if we have valid bounds
+      if (bounds) {
+        mapRef.fitBounds(bounds);
+      }
+
+      // const bounds = L.latLngBounds([...driverBounds, ...locationBounds]);
+
+      // mapRef.fitBounds(bounds);
     }
   }, [
     mapRef,

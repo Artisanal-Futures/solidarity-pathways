@@ -6,7 +6,6 @@ import { useDriver } from "~/providers/driver";
 
 import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
 import { api } from "~/trpc/react";
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import { Button } from "~/components/ui/button";
@@ -17,7 +16,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "~/components/map-sheet";
-import { DataTable } from "~/app/_components/data-sheet/data-table";
+import { DataTable } from "~/components/shared/data-sheet/data-table";
 import { DriverForm } from "~/app/[depotId]/_components/driver/driver-form";
 
 import { driverDepotColumns } from "./driver-depot-columns";
@@ -36,7 +35,7 @@ export const DriverVehicleSheet: FC<Props> = ({ standalone }) => {
   } = useDriver();
 
   const { defaultActions } = useDefaultMutationActions({
-    invalidateEntities: ["driver", "routePlan"],
+    invalidateEntities: ["driver", "vehicle", "routePlan"],
   });
 
   const overrideCurrentRoutes = api.routePlan.setRouteVehicles.useMutation({
@@ -47,10 +46,9 @@ export const DriverVehicleSheet: FC<Props> = ({ standalone }) => {
     },
   });
 
-  const getRouteVehicles = api.routePlan.getVehicleBundles.useQuery(
-    { routeId },
-    { enabled: !!routeId },
-  );
+  const getRouteVehicles = api.vehicle.getBundles.useQuery(routeId, {
+    enabled: !!routeId,
+  });
 
   const getDepotDrivers = api.driver.getAll.useQuery(depotId, {
     enabled: !!depotId && depotMode !== "calculate",

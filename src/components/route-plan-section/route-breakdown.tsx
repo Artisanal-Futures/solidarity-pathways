@@ -1,13 +1,14 @@
-import type { ElementType, FC, HTMLAttributes } from "react";
+import type { ElementType, HTMLAttributes } from "react";
 import { useClient } from "~/providers/client";
 
-import type { DriverVehicleBundle, OptimizedStop } from "~/types.wip";
+import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
+import type { OptimizedStop } from "~/types/optimized";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import StepLineSegment from "~/components/other/step-line-segment";
 
-type RouteBreakdownProps = {
+type Props = {
   driver: DriverVehicleBundle | null | undefined;
   steps: OptimizedStop[];
   color: string | undefined;
@@ -16,14 +17,7 @@ type RouteBreakdownProps = {
 /**
  * Acts as a timeline breakdown for each stop in the route.
  */
-const RouteBreakdown: FC<RouteBreakdownProps> = ({
-  driver,
-  steps,
-  color,
-  className,
-}) => {
-  // const { setSelectedStop } = useDriverRoute((state) => state);
-
+export const RouteBreakdown = ({ driver, steps, color, className }: Props) => {
   const { openViewJob } = useClient();
 
   let jobIndex = 0;
@@ -78,5 +72,3 @@ const RouteBreakdown: FC<RouteBreakdownProps> = ({
     </ScrollArea>
   );
 };
-
-export default RouteBreakdown;

@@ -1,6 +1,7 @@
 "use client";
-import { useSession } from "next-auth/react";
+
 import { useParams, usePathname, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 
 export const useSolidarityState = () => {
   const params = useParams();

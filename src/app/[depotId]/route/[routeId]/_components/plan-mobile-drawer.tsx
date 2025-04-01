@@ -1,6 +1,10 @@
+"use client";
+
 import { useState } from "react";
 import { ArrowRight, Pencil } from "lucide-react";
 
+import { api } from "~/trpc/react";
+import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { useRoutePlans } from "~/hooks/plans/use-route-plans";
 import { useUrlParams } from "~/hooks/use-url-params";
 import { Button } from "~/components/ui/button";
@@ -13,19 +17,19 @@ import {
   DrawerTrigger,
 } from "~/components/ui/drawer";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { StopsTab } from "~/components/stops-section/stops-tab";
-
-import { DriversTab } from "./drivers-tab";
+import { StopsTab } from "~/app/[depotId]/_components/client/stops-tab";
+import { DriversTab } from "~/app/[depotId]/_components/driver/drivers-tab";
 
 export const PlanMobileDrawer = () => {
   const { updateUrlParams } = useUrlParams();
-  const { getRoutePlanData, calculate } = useRoutePlans();
 
-  const optimized = getRoutePlanData.data?.optimizedRoute ?? [];
+  const { routeId } = useSolidarityState();
 
-  const isRouteDataMissing =
-    getRoutePlanData.data?.jobs.length === 0 ||
-    getRoutePlanData.data?.vehicles.length === 0;
+  const getRoutePlanData = api.routePlan.get.useQuery(routeId, {
+    enabled: false,
+  });
+
+  const { calculate, optimized, isRouteDataMissing } = useRoutePlans();
 
   const [editDrawerOpen, setEditDrawerOpen] = useState<boolean>(false);
 

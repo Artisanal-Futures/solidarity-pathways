@@ -37,10 +37,9 @@ export const HomepageJobImportCard = () => {
     },
   });
 
-  const { data: routeJobs } = api.routePlan.getJobBundles.useQuery(
-    { routeId },
-    { enabled: routeId !== undefined },
-  );
+  const { data: routeJobs } = api.job.getBundles.useQuery(routeId, {
+    enabled: routeId !== undefined,
+  });
 
   const { data: depotClients } = api.customer.getAll.useQuery(depotId, {
     enabled: !!depotId && !!depotMode && depotMode !== "calculate",

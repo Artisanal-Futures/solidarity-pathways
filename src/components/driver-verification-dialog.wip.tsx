@@ -1,7 +1,8 @@
+import { useEffect, useRef, useState } from "react";
+import { notificationService } from "~/services/notification";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 
-import { useEffect, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -13,8 +14,7 @@ import {
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { useUrlParams } from "~/hooks/use-url-params";
-import { notificationService } from "~/services/notification";
+
 import { useSolidarityState } from "../hooks/optimized-data/use-solidarity-state";
 
 export const DriverVerificationDialog = ({

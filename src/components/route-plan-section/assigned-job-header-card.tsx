@@ -1,15 +1,14 @@
-import { formatWord } from "~/utils/format-word";
+import { useDriver } from "~/providers/driver";
+import { ChevronRight } from "lucide-react";
+
 import {
   metersToMiles,
   unixSecondsToStandardTime,
 } from "~/utils/generic/format-utils.wip";
-import { ChevronRight } from "lucide-react";
-
+import { formatWord } from "~/lib/helpers/format-word";
 import { cn } from "~/lib/utils";
-import { api } from "~/trpc/react";
-import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import OnlineIndicator from "~/components/other/online-indicator";
+import { OnlineIndicator } from "~/components/other/online-indicator";
 
 type Props = {
   routeStatus: string;
@@ -34,13 +33,9 @@ export const AssignedJobHeaderCard = ({
   isOnline = false,
   isButton = false,
 }: Props) => {
-  const { routeId } = useSolidarityState();
+  const { findVehicleById } = useDriver();
 
-  const getVehicleById = api.routePlan.getVehicleById.useQuery(
-    { routeId, vehicleId },
-    { enabled: !!routeId && !!vehicleId },
-  );
-  const driverBundle = getVehicleById.data;
+  const driverBundle = findVehicleById(vehicleId);
 
   const status = formatWord(routeStatus);
 

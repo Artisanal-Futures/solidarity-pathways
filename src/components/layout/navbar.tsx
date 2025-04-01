@@ -21,7 +21,7 @@ export const Navbar = () => {
             <Link href="/" className="flex items-center gap-x-2 lg:ml-0">
               <Image
                 className="block h-5 lg:hidden"
-                src="/img/logo_mobile.png"
+                src="/logo_mobile.png"
                 alt="Artisanal Futures logo"
                 width={20}
                 height={20}
@@ -30,7 +30,7 @@ export const Navbar = () => {
               <span className="hidden items-center gap-1 lg:flex">
                 <Image
                   className="block h-5"
-                  src="/img/logo_mobile.png"
+                  src="/logo_mobile.png"
                   alt="Artisanal Futures logo"
                   width={20}
                   height={20}
@@ -50,7 +50,6 @@ export const Navbar = () => {
                 </PathwaysSettingsMenu>
               )}
 
-              {/* <PathwaysNotifications /> */}
               <NavbarActions />
             </div>
           </div>

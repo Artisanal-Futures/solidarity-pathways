@@ -1,12 +1,9 @@
 import { useClient } from "~/providers/client";
 import { CheckCircle, Coffee, Home, XCircle } from "lucide-react";
 
-import type { OptimizedStop } from "../../types.wip";
+import type { OptimizedStop } from "~/types/optimized";
+import { unixSecondsToStandardTime } from "~/utils/generic/format-utils.wip";
 import { cn } from "~/lib/utils";
-import { api } from "~/trpc/react";
-import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
-
-import { unixSecondsToStandardTime } from "../../utils/generic/format-utils.wip";
 
 type Props = {
   step: OptimizedStop;

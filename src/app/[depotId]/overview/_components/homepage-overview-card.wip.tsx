@@ -1,10 +1,14 @@
+"use client";
+
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 
+import { api } from "~/trpc/react";
 import { useDepot } from "~/hooks/depot/use-depot";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
-import { useRoutePlans } from "~/hooks/plans/use-route-plans";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import {
   Card,
   CardDescription,
@@ -13,12 +17,30 @@ import {
 } from "~/components/ui/card";
 
 export const HomePageOverviewCard = () => {
-  const { depotId, routeDate, isFirstTime, sessionStatus } =
-    useSolidarityState();
+  const { depotId, routeDate, dateParam } = useSolidarityState();
+  const router = useRouter();
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["routePlan", "job", "vehicle"],
+  });
 
   const { currentDepot } = useDepot();
 
-  const routePlan = useRoutePlans();
+  const createRoutePlan = api.routePlan.create.useMutation({
+    ...defaultActions,
+    onSuccess: ({ data, message }) => {
+      defaultActions.onSuccess({ message });
+      void router.push(`/${depotId}/route/${data.id}?mode=plan`);
+    },
+  });
+  const getAllRoutesByDate = api.routePlan.getAllByDate.useQuery(
+    {
+      date: routeDate ?? new Date(),
+      depotId,
+    },
+    {
+      enabled: !!depotId && !!dateParam,
+    },
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -28,15 +50,11 @@ export const HomePageOverviewCard = () => {
   }, []);
 
   const manuallyCreateRoute = () =>
-    routePlan.create({ depotId, date: routeDate });
+    createRoutePlan.mutate({ depotId, date: routeDate });
 
-  const isUserAuthenticated = !isFirstTime && sessionStatus === "authenticated";
   const finalizedRoutes =
-    routePlan.routesByDate?.filter((route) => route.optimizedRoute.length > 0)
+    getAllRoutesByDate?.data?.filter((route) => route.optimizedRoute.length > 0)
       .length ?? null;
-
-  // route.optimizedRoute.length > 0
-  if (!isUserAuthenticated) return null;
 
   return (
     <Card className="w-full max-w-md lg:max-w-xl">

@@ -7,8 +7,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RouteStatus } from "@prisma/client";
 
-import type { OptimizedStop } from "../../types.wip";
 import type { EditStopFormValues } from "~/lib/validators/route-plan";
+import type { OptimizedStop } from "~/types/optimized";
 import { editStopFormSchema } from "~/lib/validators/route-plan";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
@@ -34,7 +34,7 @@ export const CurrentStopForm = ({ initialData }: Props) => {
 
   const apiContext = api.useUtils();
 
-  const updateStopStatus = api.routePlan.updateOptimizedStopState.useMutation({
+  const updateStopStatus = api.routePlan.updateOptimizedStop.useMutation({
     onSuccess: () => {
       notificationService.notifySuccess({
         message: "Stop status was successfully updated.",

@@ -2,66 +2,45 @@
 
 import { redirect, useRouter } from "next/navigation";
 
-import { toastService } from "@dreamwalker-studios/toasts";
-
 import { api } from "~/trpc/react";
 
 import { useSolidarityState } from "../optimized-data/use-solidarity-state";
+import { useDefaultMutationActions } from "../use-default-mutation-actions";
 import { useDepotModal } from "./use-depot-modal.wip";
 
 export const useDepot = () => {
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["depot"],
+  });
   const { depotId } = useSolidarityState();
-  const apiContext = api.useUtils();
+
   const depotModal = useDepotModal();
   const router = useRouter();
 
-  const getDepot = api.depots.getDepot.useQuery(
-    { depotId },
-    { enabled: !!depotId },
-  );
+  const getDepot = api.depot.get.useQuery(depotId, { enabled: !!depotId });
 
-  const createDepot = api.depots.create.useMutation({
-    onSuccess: ({ data }) =>
-      createDepotServer.mutate({
-        depotId: data.id,
-        ownerId: data.ownerId,
-      }),
-    onError: (error) => toastService.error({ message: error?.message, error }),
+  const createDepot = api.depot.create.useMutation({
+    ...defaultActions,
+    onSuccess: ({ data, message }) => {
+      defaultActions.onSuccess({ message });
+      void router.push(`/${data.id}/overview?welcome=true`);
+    },
   });
 
-  const createDepotServer = api.routeMessaging.createNewDepotServer.useMutation(
-    {
-      onSuccess: (data) => {
-        const depot = data.server.inviteCode.split("-")[1];
-
-        void router.push(`/${depot}/overview?welcome=true`);
-
-        toastService.success(
-          "Depot and messaging server has been successfully created.",
-        );
-      },
-      onError: (error) =>
-        toastService.error({ message: error?.message, error }),
-      onSettled: () => void apiContext.routeMessaging.invalidate(),
-    },
-  );
-
-  const updateDepot = api.depots.update.useMutation({
-    onSuccess: ({ message }) => toastService.success(message),
-    onError: (error) => toastService.error({ message: error?.message, error }),
+  const updateDepot = api.depot.update.useMutation({
+    ...defaultActions,
     onSettled: () => {
-      void apiContext.depots.invalidate();
+      defaultActions.onSettled();
       depotModal.onClose();
     },
   });
 
-  const deleteDepot = api.depots.delete.useMutation({
+  const deleteDepot = api.depot.delete.useMutation({
+    ...defaultActions,
     onSuccess: ({ message }) => {
-      toastService.success(message);
+      defaultActions.onSuccess({ message });
       void redirect("/");
     },
-    onError: (error) => toastService.error({ message: error?.message, error }),
-    onSettled: () => void apiContext.depots.invalidate(),
   });
 
   return {

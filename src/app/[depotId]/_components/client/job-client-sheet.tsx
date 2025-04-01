@@ -2,11 +2,10 @@ import { useState } from "react";
 import { useClient } from "~/providers/client";
 import { Mail, MapPin } from "lucide-react";
 
-import type { ClientJobBundle } from "~/types.wip";
+import type { ClientJobBundle } from "~/lib/validators/client-job";
 import { api } from "~/trpc/react";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
-import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import {
   Sheet,
@@ -15,18 +14,27 @@ import {
   SheetHeader,
   SheetTitle,
 } from "~/components/map-sheet";
-import { DataTable } from "~/app/_components/data-sheet/data-table";
+import { DataTable } from "~/components/shared/data-sheet/data-table";
+import { LoadButton } from "~/components/shared/load-button";
 import { StopForm } from "~/app/[depotId]/_components/client/stop-form";
 
 import { jobDepotColumns } from "./job-depot-columns";
 import { JobDepotPreviousRouteSelect } from "./job-depot-previous-route-select";
 
 export const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
+  const [selectedData, setSelectedData] = useState<ClientJobBundle[]>([]);
+  const [date, setDate] = useState<Date>();
+
+  const { depotId, sessionStatus, routeId } = useSolidarityState();
+
   const { defaultActions } = useDefaultMutationActions({
     invalidateEntities: ["job", "routePlan"],
   });
 
-  const { depotId, sessionStatus, routeId } = useSolidarityState();
+  const getStopsByDate = api.routePlan.getStopsByDate.useQuery(
+    { date: date!, depotId },
+    { enabled: !!date && !!depotId },
+  );
 
   const createJobBundles = api.job.createMany.useMutation({
     ...defaultActions,
@@ -41,21 +49,9 @@ export const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
     routeJobs,
   } = useClient();
 
-  const [selectedData, setSelectedData] = useState<ClientJobBundle[]>([]);
-  const [date, setDate] = useState<Date>();
-
-  const getStopsByDate = api.routePlan.getStopsByDate.useQuery(
-    { date: date!, depotId },
-    { enabled: !!date && !!depotId },
-  );
-
   const title = activeJobData
     ? `${activeJobData?.client?.name ?? `Job #${activeJobData?.job?.id}`}`
     : "Add Stop";
-
-  const areDepotOptionsVisible = activeJobData === null && !standalone;
-
-  const areStorageOptionsVisible = activeJobData !== null || standalone;
 
   const assignPreviousJobsToRoute = () => {
     createJobBundles.mutate({
@@ -65,8 +61,6 @@ export const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
     });
   };
 
-  const { activeJobId } = useClient();
-
   return (
     <Sheet open={isJobSheetOpen} onOpenChange={onSheetOpenChange}>
       <SheetContent
@@ -75,13 +69,11 @@ export const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
         onInteractOutside={(e) => e.preventDefault()}
       >
         <SheetHeader>
-          <SheetTitle className="text-center md:text-left">
-            {activeLocation}
-          </SheetTitle>
+          <SheetTitle className="text-center md:text-left">{title}</SheetTitle>
           <SheetDescription className="text-center md:text-left">
             {activeJobData ? (
               <>
-                <p className="flex w-full flex-1 flex-col border-b border-t py-4 text-sm">
+                <span className="flex w-full flex-1 flex-col border-b border-t py-4 text-sm">
                   <span className="flex items-center gap-2 font-light text-muted-foreground">
                     <MapPin size={15} /> {activeJobData.job.address?.formatted}
                   </span>
@@ -91,7 +83,7 @@ export const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
                       <Mail size={15} /> {activeJobData?.client?.email}
                     </span>
                   )}
-                </p>
+                </span>
               </>
             ) : (
               `Fill out the table below to start adding destinations to the map. ${JSON.stringify(activeJobData)}`
@@ -103,7 +95,7 @@ export const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
 
         {sessionStatus === "loading" && <p>Loading...</p>}
 
-        {areDepotOptionsVisible && (
+        {activeJobData === null && !standalone && (
           <>
             <Tabs
               className="z-0 w-full"
@@ -122,12 +114,13 @@ export const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
               <TabsContent value="add-previous">
                 <div className="flex w-full flex-col gap-3 border-b bg-white p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <Button
+                    <LoadButton
                       className="flex-1"
                       onClick={assignPreviousJobsToRoute}
+                      isLoading={createJobBundles.isPending}
                     >
                       Update route jobs
-                    </Button>
+                    </LoadButton>
                   </div>
                 </div>
 
@@ -164,7 +157,7 @@ export const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
         {/* Option 2: use is logged in and allows for user to select existing drivers
           as well as add new drivers to the database
         */}
-        {areStorageOptionsVisible && (
+        {(activeJobData !== null || standalone) && (
           <StopForm
             handleOnOpenChange={onSheetOpenChange}
             activeLocation={activeJobData}

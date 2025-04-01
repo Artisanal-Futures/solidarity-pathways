@@ -5,13 +5,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Bomb, Truck, User } from "lucide-react";
 
-import { toastService } from "@dreamwalker-studios/toasts";
 import { DialogClose } from "@radix-ui/react-dialog";
 
 import { api } from "~/trpc/react";
 import { useDepot } from "~/hooks/depot/use-depot";
 import { useDepotModal } from "~/hooks/depot/use-depot-modal.wip";
-import { useDriverVehicleBundles } from "~/hooks/drivers/use-driver-vehicle-bundles";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import { Button } from "~/components/ui/button";
@@ -26,7 +24,7 @@ import {
 } from "~/components/ui/dialog";
 import { ScrollArea } from "~/components/ui/scroll-area";
 
-import { AlertModal } from "../layout/alert-modal";
+import { DeleteDialog } from "../delete-dialog";
 import { DepotModal } from "./depot-modal";
 
 export const PathwaysSettingsMenu = ({ children }: { children: ReactNode }) => {
@@ -39,27 +37,13 @@ export const PathwaysSettingsMenu = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { currentDepot, deleteDepot } = useDepot();
   const { depotId } = useSolidarityState();
-  const apiContext = api.useUtils();
+
   const onOpen = useDepotModal((state) => state.onOpen);
 
   const deleteClientsMutation =
     api.customer.deleteAllFromDepot.useMutation(defaultActions);
 
-  const deleteMessagingMutation = api.routeMessaging.nukeEverything.useMutation(
-    {
-      onSuccess: ({ message }) => toastService.success(message),
-      onError: (error) => {
-        toastService.error({
-          message: "There seems to be an issue with deleting your Messaging.",
-          error,
-        });
-      },
-      onSettled: () => void apiContext.routeMessaging.invalidate(),
-    },
-  );
-
   const deleteCurrentDepot = () => {
-    deleteMessagingMutation.mutate();
     deleteDepot.mutate(depotId);
   };
 
@@ -130,40 +114,26 @@ export const PathwaysSettingsMenu = ({ children }: { children: ReactNode }) => {
                 <h4 className="font-semibold">Drivers & Clients</h4>
 
                 <div className="flex gap-4 max-md:flex-col">
-                  <AlertModal
-                    onContinue={() => purgeAllDriversMutation.mutate(depotId)}
-                  >
-                    <Button
-                      variant={"destructive"}
-                      className="flex flex-1 items-center gap-2"
-                    >
-                      <Truck className="h-4 w-4" />
-                      Delete Drivers
-                    </Button>
-                  </AlertModal>
-                  <AlertModal
-                    onContinue={() => deleteClientsMutation.mutate({ depotId })}
-                  >
-                    <Button
-                      className="flex flex-1 items-center gap-2"
-                      variant={"destructive"}
-                    >
-                      <User className="h-4 w-4" />
-                      Delete Clients
-                    </Button>
-                  </AlertModal>
+                  <DeleteDialog
+                    onConfirm={() => purgeAllDriversMutation.mutate(depotId)}
+                    Icon={Truck}
+                    title="Delete Drivers"
+                  />
+
+                  <DeleteDialog
+                    onConfirm={() => deleteClientsMutation.mutate({ depotId })}
+                    Icon={User}
+                    title="Delete Clients"
+                  />
                 </div>
 
                 <h4 className="font-semibold">Depot</h4>
 
-                <AlertModal onContinue={deleteCurrentDepot}>
-                  <Button
-                    className="flex w-full items-center gap-2"
-                    variant={"destructive"}
-                  >
-                    <Bomb className="h-4 w-4" /> Delete Depot
-                  </Button>
-                </AlertModal>
+                <DeleteDialog
+                  onConfirm={deleteCurrentDepot}
+                  Icon={Bomb}
+                  title="Delete Depot"
+                />
               </div>
             </div>
           </ScrollArea>

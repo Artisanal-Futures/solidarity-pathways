@@ -24,10 +24,9 @@ export const HomepageDriverImportCard = () => {
     invalidateEntities: ["driver", "routePlan"],
   });
 
-  const { data: routeDrivers } = api.routePlan.getVehicleBundles.useQuery(
-    { routeId },
-    { enabled: !!routeId },
-  );
+  const { data: routeDrivers } = api.vehicle.getBundles.useQuery(routeId, {
+    enabled: !!routeId,
+  });
 
   const { data: depotDrivers } = api.driver.getAll.useQuery(depotId, {
     enabled: !!depotId && depotMode !== "calculate",

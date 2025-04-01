@@ -4,8 +4,8 @@ import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 
 import { cn } from "~/lib/utils";
+import { api } from "~/trpc/react";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
-import { useRoutePlans } from "~/hooks/plans/use-route-plans";
 import { useMediaQuery } from "~/hooks/use-media-query";
 import { useUrlParams } from "~/hooks/use-url-params";
 import { Button } from "~/components/ui/button";
@@ -17,11 +17,13 @@ import {
 } from "~/components/ui/popover";
 
 export const RouteCalendar = () => {
-  const { routeDate } = useSolidarityState();
-  const { allRoutes } = useRoutePlans();
+  const { routeDate, depotId } = useSolidarityState();
+  const getAllRoutes = api.routePlan.getAll.useQuery(depotId, {
+    enabled: !!depotId,
+  });
   const { updateUrlParams } = useUrlParams();
 
-  const dateMap = allRoutes.map((route) => route.deliveryAt);
+  const dateMap = getAllRoutes?.data?.map((route) => route.deliveryAt);
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   useEffect(() => {

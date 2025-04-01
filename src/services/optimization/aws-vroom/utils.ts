@@ -1,6 +1,8 @@
 import polyline from "@mapbox/polyline";
 
-import type { OptimizationData, Polyline, RouteData } from "~/types";
+import type { Polyline } from "~/types/geolocation";
+import type { OptimizationData } from "~/types/optimized";
+import type { RouteData } from "~/types/route";
 import { cuidToIndex } from "~/utils/generic/format-utils.wip";
 
 const calculateGeometry = (data: OptimizationData): Polyline[] => {

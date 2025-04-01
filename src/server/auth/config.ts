@@ -1,11 +1,12 @@
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import type { Role } from "@prisma/client";
-import { type DefaultSession, type NextAuthConfig } from "next-auth";
-import { Adapter } from "next-auth/adapters";
-import DiscordProvider from "next-auth/providers/discord";
-import { env } from "~/env";
-
+import type { Adapter } from "next-auth/adapters";
 import { db } from "~/server/db";
+import { type DefaultSession, type NextAuthConfig } from "next-auth";
+import DiscordProvider from "next-auth/providers/discord";
+
+import type { Role } from "@prisma/client";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+
+import { env } from "~/env";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`

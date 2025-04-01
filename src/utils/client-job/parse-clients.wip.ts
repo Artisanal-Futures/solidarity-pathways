@@ -1,11 +1,8 @@
 import geocodingService from "~/services/autocomplete";
 
 import type { ClientJobBundle } from "~/lib/validators/client-job";
-import type {
-  FileUploadFetch,
-  FileUploadHandler,
-  VersionOneClientCSV,
-} from "~/types.wip";
+import type { FileUploadFetch, FileUploadHandler } from "~/types/misc";
+import type { VersionOneClientCSV } from "~/types/parsing";
 import { formatClientSheetRowToBundle } from "~/utils/client-job/format-clients.wip";
 import { parseSpreadSheet } from "~/utils/generic/parse-csv.wip";
 

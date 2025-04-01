@@ -1,4 +1,4 @@
-const OnlineIndicator = () => {
+export const OnlineIndicator = () => {
   return (
     <div className="flex basis-1/3 items-center gap-2">
       <span className="text-sm text-green-500">Online</span>
@@ -9,5 +9,3 @@ const OnlineIndicator = () => {
     </div>
   );
 };
-
-export default OnlineIndicator;

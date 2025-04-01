@@ -2,23 +2,22 @@
 
 import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { getColor } from "~/utils/generic/color-handling";
-import { cuidToIndex } from "~/utils/generic/format-utils.wip";
+import { useDriver } from "~/providers/driver";
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import { Beforeunload } from "react-beforeunload";
 
-import type { OptimizedStop } from "~/types.wip";
+import type { OptimizedStop } from "~/types/optimized";
+import { getColor } from "~/utils/generic/color-handling";
+import { cuidToIndex } from "~/utils/generic/format-utils.wip";
 import { api } from "~/trpc/react";
-import { useOptimizedRoutePlan } from "~/hooks/optimized-data/use-optimized-route-plan";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { DriverVerificationDialog } from "~/components/driver-verification-dialog.wip";
 import RouteLayout from "~/components/layout/route-layout";
 import { MobileDrawer } from "~/components/mobile/mobile-drawer.wip";
-import PageLoader from "~/components/other/page-loader";
-import RouteBreakdown from "~/components/route-plan-section/route-breakdown";
+import { PageLoader } from "~/components/other/page-loader";
+import { RouteBreakdown } from "~/components/route-plan-section/route-breakdown";
 import { FieldJobSheet } from "~/components/tracking/field-job-sheet.wip";
-import { MessageSheet } from "~/app/[depotId]/route/[routeId]/_components/messaging/message-sheet";
 
 type Props = {
   verifiedDriver: string | null;
@@ -31,21 +30,20 @@ const LazyRoutingMap = dynamic(() => import("~/components/map/routing-map"), {
 
 export const OptimizedPathClient = ({ verifiedDriver }: Props) => {
   const { data: session } = useSession();
-  const { driverId, routeId } = useSolidarityState();
+  const { driverId, pathId } = useSolidarityState();
 
   const [approval, setApproval] = useState(verifiedDriver !== null);
 
-  const optimizedRoutePlan = useOptimizedRoutePlan();
-
-  const getVehicleById = api.routePlan.getVehicleByIdControlled.useMutation();
-
-  const driver = getVehicleById.mutateAsync({
-    routeId,
-    vehicleId: optimizedRoutePlan?.data?.vehicleId ?? "",
+  const getOptimizedData = api.routePlan.getOptimized.useQuery(pathId, {
+    enabled: !!pathId,
   });
 
+  const { findVehicleById } = useDriver();
+
+  const driver = findVehicleById(getOptimizedData?.data?.vehicleId ?? "");
+
   const routeColor = getColor(
-    cuidToIndex(optimizedRoutePlan?.data?.vehicleId ?? ""),
+    cuidToIndex(getOptimizedData?.data?.vehicleId ?? ""),
   );
 
   useEffect(() => {
@@ -69,13 +67,13 @@ export const OptimizedPathClient = ({ verifiedDriver }: Props) => {
     return (
       <>
         <FieldJobSheet />
-        <MessageSheet />
+
         <RouteLayout>
-          {optimizedRoutePlan.isLoading ? (
+          {getOptimizedData.isPending ? (
             <PageLoader />
           ) : (
             <>
-              {optimizedRoutePlan.data && (
+              {getOptimizedData?.data && (
                 // flex-col-reverse was the original layout
                 <section className="flex flex-1 flex-col border-2 max-md:h-full lg:flex-row">
                   <div className="flex w-full flex-col gap-4 max-lg:hidden max-lg:h-4/6 lg:w-5/12 xl:w-3/12">
@@ -87,7 +85,7 @@ export const OptimizedPathClient = ({ verifiedDriver }: Props) => {
                       />
 
                       <RouteBreakdown
-                        steps={optimizedRoutePlan.data.stops as OptimizedStop[]}
+                        steps={getOptimizedData?.data.stops as OptimizedStop[]}
                         driver={void driver}
                         color={routeColor.background}
                       />

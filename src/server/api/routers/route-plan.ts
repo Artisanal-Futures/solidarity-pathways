@@ -1,26 +1,36 @@
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { driverVehicleSchema, optimizationPlanSchema } from "~/types.wip";
 import { z } from "zod";
 
 import { RouteStatus } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
-import type { ClientJobBundle, DriverVehicleBundle } from "~/types.wip";
+import type { ClientJobBundle } from "~/lib/validators/client-job";
 import { pusherServer } from "~/lib/soketi/server";
+import { driverVehicleSchema } from "~/lib/validators/driver-vehicle";
+import { optimizationPlanSchema } from "~/lib/validators/optimization";
 
 export const routePlanRouter = createTRPCRouter({
-  clearOptimizedStopsFromRoute: protectedProcedure
-    .input(z.object({ routeId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
+  clearOptimizedStops: protectedProcedure
+    .input(z.string())
+    .mutation(async ({ ctx, input: routeId }) => {
       await ctx.db.route.update({
-        where: { id: input.routeId },
+        where: { id: routeId },
         data: { optimizedRoute: { deleteMany: {} }, optimizedData: null },
       });
 
       await ctx.db.job.updateMany({
-        where: { routeId: input.routeId },
+        where: { routeId: routeId },
         data: { isOptimized: false },
       });
+
+      // Notify UI
+      await pusherServer.trigger(
+        "map",
+        `evt::clear-route`,
+        `evt::invalidate-stops`,
+      );
+
+      console.log("i should've cleared the route!!");
 
       return {
         data: "success",
@@ -28,7 +38,7 @@ export const routePlanRouter = createTRPCRouter({
       };
     }),
 
-  setOptimizedDataWithVroom: protectedProcedure
+  optimizeWithVroom: protectedProcedure
     .input(
       z.object({
         plan: optimizationPlanSchema,
@@ -91,21 +101,24 @@ export const routePlanRouter = createTRPCRouter({
             routePathId: optimizedRoute.id,
           }));
 
-          await ctx.db.optimizedStop.createMany({
-            data: stops,
-          });
+          await ctx.db.optimizedStop.createMany({ data: stops });
 
           return optimizedRoute;
         }),
       );
 
-      return ctx.db.route.update({
+      const updatedRoute = await ctx.db.route.update({
         where: { id: input.routeId },
         data: { optimizedData: JSON.stringify(input.plan.data) },
       });
+
+      return {
+        data: updatedRoute,
+        message: "Optimized data has been saved.",
+      };
     }),
 
-  updateOptimizedStopState: protectedProcedure
+  updateOptimizedStop: protectedProcedure
     .input(
       z.object({
         stopId: z.string(),
@@ -115,9 +128,7 @@ export const routePlanRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const optimizedStop = await ctx.db.optimizedStop.update({
-        where: {
-          id: input.stopId,
-        },
+        where: { id: input.stopId },
         data: {
           status: input.state,
           notes: input.notes,
@@ -144,22 +155,17 @@ export const routePlanRouter = createTRPCRouter({
       };
     }),
 
-  updateOptimizedRoutePathStatus: protectedProcedure
+  updateOptimizedPath: protectedProcedure
     .input(
       z.object({
         pathId: z.string(),
         state: z.nativeEnum(RouteStatus),
-        // notes: z.string().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const optimizedStop = ctx.db.optimizedRoutePath.update({
-        where: {
-          id: input.pathId,
-        },
-        data: {
-          status: input.state,
-        },
+        where: { id: input.pathId },
+        data: { status: input.state },
       });
 
       await pusherServer.trigger("map", `evt::invalidate-stops`, null);
@@ -169,7 +175,10 @@ export const routePlanRouter = createTRPCRouter({
         `Route ${input.pathId} status was updated to ${input.state}`,
       );
 
-      return optimizedStop;
+      return {
+        data: optimizedStop,
+        message: "Route path was successfully updated.",
+      };
     }),
 
   getOptimizedStopsByAddress: protectedProcedure
@@ -178,12 +187,7 @@ export const routePlanRouter = createTRPCRouter({
       const stops = await ctx.db.optimizedStop.findMany({
         where: {
           routePathId: input.optimizedRouteId,
-
-          job: {
-            address: {
-              formatted: input.address,
-            },
-          },
+          job: { address: { formatted: input.address } },
         },
         include: {
           job: {
@@ -197,31 +201,35 @@ export const routePlanRouter = createTRPCRouter({
 
       return stops;
     }),
-  getOptimizedData: protectedProcedure
-    .input(z.object({ pathId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      if (!input.pathId) return null;
+  getOptimized: protectedProcedure
+    .input(z.string())
+    .query(async ({ ctx, input: optimizedRoutePathId }) => {
+      if (!optimizedRoutePathId) return null;
       return ctx.db.optimizedRoutePath.findUnique({
-        where: { id: input.pathId },
-        include: { stops: true },
-      });
-    }),
-
-  getAllRoutes: protectedProcedure
-    .input(
-      z.object({
-        depotId: z.string(),
-      }),
-    )
-    .query(({ ctx, input }) => {
-      return ctx.db.route.findMany({
-        where: {
-          depotId: input.depotId,
+        where: { id: optimizedRoutePathId },
+        include: {
+          stops: {
+            include: {
+              job: {
+                include: {
+                  client: true,
+                },
+              },
+            },
+          },
         },
       });
     }),
 
-  getRoutePlansByDate: protectedProcedure
+  getAll: protectedProcedure
+    .input(z.string())
+    .query(({ ctx, input: depotId }) => {
+      return ctx.db.route.findMany({
+        where: { depotId },
+      });
+    }),
+
+  getAllByDate: protectedProcedure
     .input(
       z.object({
         date: z.date(),
@@ -249,11 +257,7 @@ export const routePlanRouter = createTRPCRouter({
           optimizedRoute: true,
           vehicles: {
             include: {
-              driver: {
-                include: {
-                  address: true,
-                },
-              },
+              driver: { include: { address: true } },
               startAddress: true,
             },
           },
@@ -314,104 +318,51 @@ export const routePlanRouter = createTRPCRouter({
       return jobBundles as unknown as ClientJobBundle[];
     }),
 
-  getRoutePlanById: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .query(({ ctx, input }) => {
-      return ctx.db.route.findUnique({
-        where: {
-          id: input.id,
-        },
-        include: {
-          vehicles: {
-            include: {
-              driver: {
-                include: {
-                  address: true,
-                },
-              },
-              startAddress: true,
-            },
-          },
-          jobs: {
-            include: {
-              address: true,
-              client: true,
-            },
-          },
-          optimizedRoute: {
-            include: {
-              stops: true,
-              vehicle: {
-                include: {
-                  driver: true,
-                },
-              },
-            },
+  get: protectedProcedure.input(z.string()).query(({ ctx, input: routeId }) => {
+    return ctx.db.route.findUnique({
+      where: { id: routeId },
+      include: {
+        vehicles: {
+          include: {
+            driver: { include: { address: true } },
+            startAddress: true,
           },
         },
-      });
-    }),
-
-  clearRoute: protectedProcedure
-    .input(
-      z.object({
-        routeId: z.string(),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      // Delete optimized stops associated with the route
-      await ctx.db.optimizedStop.deleteMany({
-        where: {
-          routePath: {
-            routeId: input.routeId,
+        jobs: {
+          include: {
+            address: true,
+            client: true,
           },
         },
-      });
+        optimizedRoute: {
+          include: {
+            stops: true,
+            vehicle: { include: { driver: true } },
+          },
+        },
+      },
+    });
+  }),
 
-      // // Optionally, if you also need to clear or reset other data related to the route, add those operations here
-      // // For example, resetting the optimizedData field in the route
-      // await ctx.db.route.update({
-      //   where: {
-      //     id: input.routeId,
-      //   },
-      //   data: {
-      //     optimizedData: null,
-      //   },
-      // });
-
-      // Notify UI
-      await pusherServer.trigger(
-        "map",
-        `evt::clear-route`,
-        `evt::invalidate-stops`,
-      );
-
-      console.log("i should've cleared the route!!");
-
-      // Return some result or confirmation
-      return {
-        success: true,
-        message: `Route ${input.routeId} has been cleared.`,
-      };
-    }),
-
-  createRoutePlan: protectedProcedure
+  create: protectedProcedure
     .input(
       z.object({
         depotId: z.string(),
         date: z.date(),
       }),
     )
-    .mutation(({ ctx, input }) => {
-      return ctx.db.route.create({
+    .mutation(async ({ ctx, input }) => {
+      const plan = await ctx.db.route.create({
         data: {
           depotId: input.depotId,
           deliveryAt: input.date,
-          // address: input.address,
-          // latitude: input.coordinates.lat ?? 0,
-          // longitude: input.coordinates.lng ?? 0,
         },
       });
+
+      return {
+        data: plan,
+        message: "Route was successfully created.",
+      };
     }),
 
   setRouteVehicles: protectedProcedure
@@ -420,18 +371,12 @@ export const routePlanRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const route = await ctx.db.route.findUnique({
-        where: {
-          id: input.routeId,
-        },
+        where: { id: input.routeId },
         include: {
           vehicles: {
             include: {
               endAddress: true,
-              driver: {
-                include: {
-                  address: true,
-                },
-              },
+              driver: { include: { address: true } },
               startAddress: true,
               breaks: true,
             },
@@ -441,23 +386,15 @@ export const routePlanRouter = createTRPCRouter({
 
       if (route?.vehicles.length) {
         await ctx.db.route.update({
-          where: {
-            id: input.routeId,
-          },
-          data: {
-            vehicles: {
-              deleteMany: {},
-            },
-          },
+          where: { id: input.routeId },
+          data: { vehicles: { deleteMany: {} } },
         });
       }
 
       const res = await Promise.all(
         input.data.map(async (driverVehicle) => {
           const defaultVehicle = await ctx.db.vehicle.findFirst({
-            where: {
-              id: driverVehicle.driver.defaultVehicleId,
-            },
+            where: { id: driverVehicle.driver.defaultVehicleId },
             include: {
               breaks: true,
               startAddress: true,
@@ -529,157 +466,20 @@ export const routePlanRouter = createTRPCRouter({
           if (!defaultVehicle?.endAddress) return vehicle;
 
           return ctx.db.vehicle.update({
-            where: {
-              id: vehicle.id,
-            },
-            data: {
-              endAddress: {
-                connect: {
-                  id: endAddress.id,
-                },
-              },
-            },
+            where: { id: vehicle.id },
+            data: { endAddress: { connect: { id: endAddress.id } } },
           });
         }),
-      )
-        .then((data) => data)
-        .catch((e) => {
-          console.error(e);
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Something happened while creating drivers and vehicles",
-          });
-        });
+      );
 
       const routeVehicles = await ctx.db.route.update({
-        where: {
-          id: input.routeId,
-        },
-        data: {
-          vehicles: {
-            connect: res.map((v) => ({ id: v.id })),
-          },
-        },
+        where: { id: input.routeId },
+        data: { vehicles: { connect: res.map((v) => ({ id: v.id })) } },
       });
 
       return {
         data: routeVehicles,
         message: "Route drivers were successfully set.",
       };
-    }),
-
-  getVehicleBundles: protectedProcedure
-    .input(z.object({ routeId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const data = await ctx.db.vehicle.findMany({
-        where: {
-          routeId: input.routeId,
-        },
-        include: {
-          driver: {
-            include: {
-              address: true,
-            },
-          },
-          startAddress: true,
-          endAddress: true,
-          breaks: true,
-        },
-      });
-
-      const bundles = data.map((vehicle) => ({
-        driver: vehicle.driver ?? null,
-        vehicle: vehicle,
-      }));
-
-      return bundles as unknown as DriverVehicleBundle[];
-    }),
-
-  getVehicleById: protectedProcedure
-    .input(z.object({ routeId: z.string(), vehicleId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const data = await ctx.db.vehicle.findUnique({
-        where: {
-          routeId: input.routeId,
-          id: input.vehicleId,
-        },
-        include: {
-          driver: { include: { address: true } },
-          startAddress: true,
-          endAddress: true,
-          breaks: true,
-        },
-      });
-
-      return {
-        driver: data?.driver ?? null,
-        vehicle: data,
-      } as unknown as DriverVehicleBundle;
-    }),
-
-  getVehicleByIdControlled: protectedProcedure
-    .input(z.object({ routeId: z.string(), vehicleId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const data = await ctx.db.vehicle.findUnique({
-        where: {
-          routeId: input.routeId,
-          id: input.vehicleId,
-        },
-        include: {
-          driver: { include: { address: true } },
-          startAddress: true,
-          endAddress: true,
-          breaks: true,
-        },
-      });
-
-      return {
-        driver: data?.driver ?? null,
-        vehicle: data,
-      } as unknown as DriverVehicleBundle;
-    }),
-
-  getDriverByEmail: protectedProcedure
-    .input(z.object({ email: z.string(), routeId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const data = await ctx.db.vehicle.findFirst({
-        where: {
-          driver: {
-            email: input.email,
-          },
-          routeId: input.routeId,
-        },
-        include: {
-          driver: true,
-        },
-      });
-
-      return {
-        driver: data?.driver ?? null,
-        vehicle: data,
-      } as unknown as DriverVehicleBundle;
-    }),
-  getJobBundles: protectedProcedure
-    .input(z.object({ routeId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const data = await ctx.db.job.findMany({
-        where: {
-          routeId: input.routeId,
-        },
-        include: {
-          address: true,
-          client: {
-            include: {
-              address: true,
-            },
-          },
-        },
-      });
-      const bundles = data.map((job) => ({
-        client: job.client,
-        job: job,
-      })) as ClientJobBundle[];
-
-      return bundles;
     }),
 });

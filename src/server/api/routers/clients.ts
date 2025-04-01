@@ -1,8 +1,8 @@
-import { z } from "zod";
-import { geocodeAddress } from "~/lib/geocode/geocode-address";
-
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import type { Customer } from "~/types";
+import { z } from "zod";
+
+import type { Customer } from "~/types/job";
+import { geocodeAddress } from "~/lib/geocode/geocode-address";
 
 export const clientRouter = createTRPCRouter({
   import: protectedProcedure

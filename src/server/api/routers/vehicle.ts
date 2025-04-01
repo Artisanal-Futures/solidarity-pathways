@@ -1,10 +1,8 @@
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { driverSchema, driverVehicleSchema, vehicleSchema } from "~/types.wip";
 import { z } from "zod";
 
-import { TRPCError } from "@trpc/server";
-
-import type { DriverVehicleBundle } from "~/types.wip";
+import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
+import { vehicleSchema } from "~/lib/validators/driver-vehicle";
 
 // Vehicles are the entities used per route.
 export const vehicleRouter = createTRPCRouter({
@@ -69,5 +67,48 @@ export const vehicleRouter = createTRPCRouter({
         data: deletedVehicle,
         message: "Vehicles(s) successfully deleted from route.",
       };
+    }),
+
+  getBundles: protectedProcedure
+    .input(z.string())
+    .query(async ({ ctx, input: routeId }) => {
+      const data = await ctx.db.vehicle.findMany({
+        where: { routeId },
+        include: {
+          driver: { include: { address: true } },
+          startAddress: true,
+          endAddress: true,
+          breaks: true,
+        },
+      });
+
+      const bundles = data.map((vehicle) => ({
+        driver: vehicle.driver ?? null,
+        vehicle: vehicle,
+      }));
+
+      return (bundles as unknown as DriverVehicleBundle[]) ?? [];
+    }),
+
+  getBundleById: protectedProcedure
+    .input(z.object({ routeId: z.string(), vehicleId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const data = await ctx.db.vehicle.findUnique({
+        where: {
+          routeId: input.routeId,
+          id: input.vehicleId,
+        },
+        include: {
+          driver: { include: { address: true } },
+          startAddress: true,
+          endAddress: true,
+          breaks: true,
+        },
+      });
+
+      return {
+        driver: data?.driver ?? null,
+        vehicle: data,
+      } as unknown as DriverVehicleBundle;
     }),
 });

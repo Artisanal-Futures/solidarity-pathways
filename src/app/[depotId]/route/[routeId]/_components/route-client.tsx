@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useClient } from "~/providers/client";
 import { notificationService } from "~/services/notification";
-import { useStopsStore } from "~/stores/use-stops-store";
 import {
   ArrowRight,
   Building,
@@ -21,9 +21,10 @@ import {
 import { toastService } from "@dreamwalker-studios/toasts";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 
-import type { Customer } from "~/types";
+import type { Customer } from "~/types/job";
 import { pusherClient } from "~/lib/soketi/client";
 import { api } from "~/trpc/react";
+import { useDepot } from "~/hooks/depot/use-depot";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { useRoutePlans } from "~/hooks/plans/use-route-plans";
 import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
@@ -31,17 +32,16 @@ import { useMassMessage } from "~/hooks/use-mass-message";
 import { useUrlParams } from "~/hooks/use-url-params";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent } from "~/components/ui/tabs";
-import { AbsolutePageLoader } from "~/components/absolute-page-loader";
 import RouteLayout from "~/components/layout/route-layout";
 import { ViewPathsMobileDrawer } from "~/components/mobile/view-paths-mobile-drawer";
-import CalculationsTab from "~/components/route-plan-section/calculations-tab";
-import { StopsTab } from "~/components/stops-section/stops-tab";
+import { AbsolutePageLoader } from "~/components/other/absolute-page-loader";
+import { CalculationsTab } from "~/components/route-plan-section/calculations-tab";
 import { JobClientSheet } from "~/app/[depotId]/_components/client/job-client-sheet";
+import { StopsTab } from "~/app/[depotId]/_components/client/stops-tab";
 import { DriverVehicleSheet } from "~/app/[depotId]/_components/driver/driver-vehicle-sheet";
-import { MessageSheet } from "~/app/[depotId]/route/[routeId]/_components/messaging/message-sheet";
+import { DriversTab } from "~/app/[depotId]/_components/driver/drivers-tab";
 
 import { makeOneClientJob } from "../_utils/make-one-client-job";
-import { DriversTab } from "./drivers-tab";
 import { PlanMobileDrawer } from "./plan-mobile-drawer";
 
 const LazyRoutingMap = dynamic(() => import("~/components/map/routing-map"), {
@@ -53,14 +53,13 @@ const LazyRoutingMap = dynamic(() => import("~/components/map/routing-map"), {
  */
 export const RouteClient = () => {
   const { defaultActions } = useDefaultMutationActions({
-    invalidateEntities: ["routePlan", "routeMessaging"],
+    invalidateEntities: ["routePlan"],
   });
 
   const { routeId, depotId } = useSolidarityState();
-  const getRouteJobs = api.routePlan.getJobBundles.useQuery(
-    { routeId },
-    { enabled: !!routeId },
-  );
+  const getRouteJobs = api.job.getBundles.useQuery(routeId, {
+    enabled: !!routeId,
+  });
 
   const apiContext = api.useUtils();
 
@@ -98,7 +97,7 @@ export const RouteClient = () => {
   });
 
   const clearOptimizedStops =
-    api.routePlan.clearOptimizedStopsFromRoute.useMutation(defaultActions);
+    api.routePlan.clearOptimizedStops.useMutation(defaultActions);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -106,12 +105,11 @@ export const RouteClient = () => {
 
   const [parent] = useAutoAnimate();
 
-  const getRouteVehicles = api.routePlan.getVehicleBundles.useQuery(
-    { routeId },
-    { enabled: !!routeId },
-  );
+  const getRouteVehicles = api.vehicle.getBundles.useQuery(routeId, {
+    enabled: !!routeId,
+  });
 
-  const routePlans = useRoutePlans();
+  const { optimized, calculate } = useRoutePlans();
 
   useEffect(() => {
     pusherClient.subscribe("map");
@@ -152,7 +150,7 @@ export const RouteClient = () => {
         key: "mode",
         value: "calculate",
       });
-      void routePlans.calculate(selectedJobIds);
+      void calculate(selectedJobIds);
     } else {
       alert(
         "Please select one or more stops before calculating optimal paths.",
@@ -165,14 +163,12 @@ export const RouteClient = () => {
 
   const { massSendRouteEmails, isLoading } = useMassMessage();
 
-  const { setSelectedJobIds, selectedJobIds } = useStopsStore.getState();
+  const { setSelectedJobIds, selectedJobIds } = useClient();
 
   const editRouteCallback = () => {
     const routeId = window.location.pathname.split("/route/")[1];
 
-    clearOptimizedStops.mutate({
-      routeId: routeId ?? "",
-    });
+    clearOptimizedStops.mutate(routeId ?? "");
 
     setSelectedJobIds([]); // reset them
 
@@ -183,6 +179,12 @@ export const RouteClient = () => {
       value: "plan",
     });
   };
+
+  const { currentDepot } = useDepot();
+
+  const getRoutePlanById = api.routePlan.get.useQuery(routeId, {
+    enabled: !!routeId,
+  });
 
   return (
     <>
@@ -200,7 +202,7 @@ export const RouteClient = () => {
           <div className="p-1">
             <Button
               onClick={() =>
-                buildJobsMutation.mutate(routePlans.depot?.magicCode ?? "")
+                buildJobsMutation.mutate(currentDepot?.magicCode ?? "")
               }
               disabled={buildJobsMutation.isPending}
               className="hover:bg-dark-gray bg-black text-white"
@@ -223,16 +225,16 @@ export const RouteClient = () => {
             </Button>
           </div>
         </div>
+
         {/* Tracking related widgets */}
         <DriverVehicleSheet />
         <JobClientSheet />
-        <MessageSheet />
 
-        {routePlans.isLoading && <AbsolutePageLoader />}
+        {getRoutePlanById.isPending && <AbsolutePageLoader />}
 
-        {!routePlans.isLoading &&
-          routePlans.data &&
-          routePlans.optimized &&
+        {!getRoutePlanById.isPending &&
+          getRoutePlanById?.data &&
+          optimized &&
           getUrlParam("mode") && (
             <section className="flex flex-1 flex-col-reverse border-2 max-md:h-full lg:flex-row">
               <Tabs
@@ -247,26 +249,26 @@ export const RouteClient = () => {
               >
                 <div className="flex items-center gap-1 px-4 pt-4 text-sm">
                   <Link
-                    href={`/${routePlans.data.depotId}/overview`}
+                    href={`/${getRoutePlanById?.data.depotId}/overview`}
                     className="flex gap-1"
                   >
                     <Building className="h-4 w-4" /> Depot{" "}
                     <span className="max-w-28 truncate text-ellipsis">
-                      {routePlans.depot?.name ?? routePlans.depot?.id}
+                      {currentDepot?.name ?? currentDepot?.id}
                     </span>{" "}
                     /{" "}
                   </Link>
                   <Link
                     href={`/${
-                      routePlans.data.depotId
-                    }/overview?date=${routePlans.data.deliveryAt
+                      getRoutePlanById?.data.depotId
+                    }/overview?date=${getRoutePlanById?.data.deliveryAt
                       .toDateString()
                       .split(" ")
                       .join("+")}`}
                     className="flex gap-1"
                   >
                     <Calendar className="h-4 w-4" />
-                    {routePlans.data?.deliveryAt.toDateString()}{" "}
+                    {getRoutePlanById?.data?.deliveryAt.toDateString()}{" "}
                   </Link>
                 </div>
 
@@ -275,7 +277,7 @@ export const RouteClient = () => {
                     <DriversTab />
                     <StopsTab />
                     <div className="flex h-16 items-center justify-end gap-2 bg-white p-4">
-                      {routePlans.optimized.length === 0 && (
+                      {optimized.length === 0 && (
                         <Button
                           onClick={calculateOptimalPaths}
                           className="gap-2"
@@ -285,7 +287,7 @@ export const RouteClient = () => {
                         </Button>
                       )}
 
-                      {routePlans.optimized.length !== 0 && (
+                      {optimized.length !== 0 && (
                         <>
                           <Button
                             variant={"outline"}
@@ -344,7 +346,7 @@ export const RouteClient = () => {
             </section>
           )}
 
-        {!routePlans.isLoading && !routePlans.data && (
+        {!getRoutePlanById.isPending && !getRoutePlanById?.data && (
           <p className="mx-auto my-auto text-center text-2xl font-semibold text-muted-foreground">
             There seems to an issue when trying to fetch your routing plan.
             Please refresh the page and try again.

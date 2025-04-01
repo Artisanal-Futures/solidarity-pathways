@@ -23,6 +23,7 @@ type UploadProps<T> = {
 };
 export type FileUploadHandler<T> = (props: UploadProps<T>) => void;
 export type FileUploadFetch<T> = (props: FetchProps<T>) => void;
+
 export type UploadOptions<T> = {
   type: keyof T;
   parseHandler: FileUploadHandler<T>;

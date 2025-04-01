@@ -4,7 +4,6 @@ import type {
   PathValue,
   UseFormReturn,
 } from "react-hook-form";
-import { Controller } from "react-hook-form";
 
 import type { Address } from "~/types/geolocation";
 import { cn } from "~/lib/utils";
@@ -71,13 +70,7 @@ export const AutoCompleteAddressFormField = <CurrentForm extends FieldValues>({
             />
             {children}
           </div>
-          {/* <AutoCompleteDepotBtn<CurrentForm>
-            value={value}
-            onChange={onChange}
-            onLatLngChange={setLatLng}
-            form={form}
-            formKey={name.replace(".formatted", "")}
-          /> */}
+
           {description && (
             <FormDescription className={cn(descriptionClassName)}>
               {description}

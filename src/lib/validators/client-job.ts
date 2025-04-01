@@ -39,6 +39,17 @@ export const jobSchema = z.object({
   isOptimized: z.boolean().optional(),
 });
 
+// .refine((input) => {
+//   // allows bar to be optional only when foo is 'foo'
+//   if (
+//     input.clientId !== undefined &&
+//     (input.email === undefined || input.email === null || input.email === "")
+//   )
+//     return false;
+
+//   return true;
+// });
+
 export const clientJobSchema = z.object({
   client: clientSchema.optional(),
   job: jobSchema,
@@ -57,3 +68,7 @@ export const newClientJobSchema = z.object({
 });
 
 export type ClientJobBundle = z.infer<typeof clientJobSchema>;
+
+export type NewClientJobBundle = z.infer<typeof newClientJobSchema>;
+
+export const jobTypeSchema = z.enum(["DELIVERY", "PICKUP"]);

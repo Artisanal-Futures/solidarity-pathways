@@ -1,11 +1,11 @@
+import { uniqueId } from "lodash";
+
+import type { Customer } from "~/types/job";
 import {
   militaryTimeToUnixSeconds,
   minutesToSeconds,
 } from "~/utils/generic/format-utils.wip";
-
-import { uniqueId } from "lodash";
-import type { Customer } from "~/types";
-import { jobTypeSchema } from "~/types.wip";
+import { jobTypeSchema } from "~/lib/validators/client-job";
 
 export const makeOneClientJob = (data: Customer) => {
   const clientId = uniqueId("client_");

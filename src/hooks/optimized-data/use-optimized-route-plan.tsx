@@ -1,13 +1,13 @@
 import type { LatLngExpression } from "leaflet";
 import { useMemo } from "react";
-import { OptimizedStop } from "~/types.wip";
 
 import type { ClientJobBundle } from "~/lib/validators/client-job";
-import type { MapPoint } from "~/types";
-import { checkIfJobExistsInRoute } from "~/lib/helpers/get-specfiic";
+import type { MapPoint } from "~/types/geolocation";
+import { checkIfJobExistsInRoute } from "~/lib/helpers/get-specifics";
 import { api } from "~/trpc/react";
 
 import { cuidToIndex } from "../../utils/generic/format-utils.wip";
+import { useDefaultMutationActions } from "../use-default-mutation-actions";
 import { useSolidarityState } from "./use-solidarity-state";
 
 type OptimizedRoutePathMapData = {
@@ -20,82 +20,42 @@ type OptimizedRoutePathMapData = {
   }[];
 };
 
-type Bundle = {
-  bundle: ClientJobBundle;
-  optimized: OptimizedStop | null;
-};
-type Destination = Map<string, Bundle[]>;
-
 export const useOptimizedRoutePlan = () => {
   const { pathId, routeId } = useSolidarityState();
 
-  const apiContext = api.useUtils();
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["routePlan", "job", "vehicle"],
+  });
 
   const updateRoutePathStatus =
-    api.routePlan.updateOptimizedRoutePathStatus.useMutation({
-      onSettled: () => {
-        void apiContext.routePlan.invalidate();
-      },
-    });
+    api.routePlan.updateOptimizedPath.useMutation(defaultActions);
 
-  const getOptimizedData = api.routePlan.getOptimizedData.useQuery(
-    { pathId },
-    { enabled: !!pathId },
-  );
+  const getOptimizedData = api.routePlan.getOptimized.useQuery(pathId, {
+    enabled: !!pathId,
+  });
 
-  const getRoutePlan = api.routePlan.getRoutePlanById.useQuery(
-    { id: routeId },
-    { enabled: !!routeId },
-  );
+  const getRoutePlan = api.routePlan.get.useQuery(routeId, {
+    enabled: !!routeId,
+  });
 
-  const getRouteJobs = api.routePlan.getJobBundles.useQuery(
-    { routeId },
-    { enabled: !!routeId },
-  );
-
-  const unassigned = getRoutePlan.data?.jobs?.filter((job) => !job.isOptimized);
-
-  const stopsThatAreJobs: OptimizedStop[] = (
-    getOptimizedData.data?.stops as OptimizedStop[]
-  )?.filter((job) => job.type === "job" && job.jobId !== null);
+  const getRouteJobs = api.job.getBundles.useQuery(routeId, {
+    enabled: !!routeId,
+  });
 
   const assigned = getOptimizedData.data?.stops
     ?.filter((job) => job.type === "job" && job.jobId !== null)
     .map((job) =>
       checkIfJobExistsInRoute({
         id: job?.jobId ?? null,
-        routeJobs: (getRouteJobs.data as ClientJobBundle[]) ?? [],
+        routeJobs: getRouteJobs.data ?? [],
       }),
     ) as ClientJobBundle[];
 
-  const currentDriver = getRoutePlan.data?.vehicles.find(
-    (vehicle) => vehicle.id === getOptimizedData.data?.vehicleId,
-  );
-
-  const routeDestinations: Destination = useMemo(() => {
-    const destinations = new Map<string, Bundle[]>();
-
-    if (stopsThatAreJobs === undefined) return destinations;
-
-    assigned?.forEach((bundle) => {
-      const key = `${bundle.job.address.formatted}`;
-      const stop = stopsThatAreJobs?.find(
-        (stop) => stop.jobId === bundle.job.id,
-      );
-
-      if (destinations.has(key)) {
-        const existing = destinations.get(key);
-        existing!.push({ bundle, optimized: stop ?? null });
-        destinations.set(key, existing!);
-      } else {
-        destinations.set(key, [{ bundle, optimized: stop ?? null }]);
-      }
-    });
-
-    return destinations;
-  }, [assigned, stopsThatAreJobs]);
-
   const mapData: OptimizedRoutePathMapData = useMemo(() => {
+    const currentVehicle = getRoutePlan.data?.vehicles.find(
+      (vehicle) => vehicle.id === getOptimizedData.data?.vehicleId,
+    );
+
     if (!getOptimizedData.data)
       return {
         driver: [],
@@ -106,13 +66,13 @@ export const useOptimizedRoutePlan = () => {
     return {
       driver: [
         {
-          id: currentDriver?.vehicle.id,
-          name: currentDriver?.driver.name,
+          id: currentVehicle?.id,
+          name: currentVehicle?.driver?.name,
           type: "vehicle",
-          lat: currentDriver?.vehicle.startAddress.latitude,
-          lng: currentDriver?.vehicle.startAddress.longitude,
-          address: currentDriver?.vehicle.startAddress.formatted,
-          color: cuidToIndex(currentDriver?.vehicle.id ?? ""),
+          lat: currentVehicle?.startAddress?.latitude,
+          lng: currentVehicle?.startAddress?.longitude,
+          address: currentVehicle?.startAddress?.formatted,
+          color: cuidToIndex(currentVehicle?.id ?? ""),
         },
       ] as unknown as MapPoint[],
       jobs:
@@ -124,7 +84,7 @@ export const useOptimizedRoutePlan = () => {
                 lat: bundle?.job?.address?.latitude,
                 lng: bundle?.job?.address?.longitude,
                 address: bundle?.job?.address?.formatted,
-                color: cuidToIndex(currentDriver?.vehicle.id ?? ""),
+                color: cuidToIndex(currentVehicle?.id ?? ""),
               };
             }) as unknown as MapPoint[])
           : ([] as MapPoint[]),
@@ -136,7 +96,7 @@ export const useOptimizedRoutePlan = () => {
         },
       ],
     };
-  }, [assigned, currentDriver, getOptimizedData.data]);
+  }, [assigned, getOptimizedData.data, getRoutePlan.data]);
 
   const mapCoordinates = useMemo(() => {
     return {
@@ -149,16 +109,12 @@ export const useOptimizedRoutePlan = () => {
 
   return {
     data: getOptimizedData.data ?? null,
-    routeDetails: getRoutePlan.data ?? null,
-    isLoading: getOptimizedData.isLoading,
-    error: null,
-    unassigned: unassigned ?? [],
+
     assigned: assigned ?? [],
-    routes: [],
+
     mapData,
     mapCoordinates,
-    destinations: routeDestinations,
+
     updateRoutePathStatus: updateRoutePathStatus.mutate,
-    currentDriver,
   };
 };

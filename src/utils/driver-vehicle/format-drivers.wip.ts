@@ -1,10 +1,8 @@
-import type {
-  DriverFormValues,
-  DriverVehicleBundle,
-  VersionOneDriverCSV,
-} from "~/types.wip";
-
 import { uniqueId } from "lodash";
+
+import type { DriverFormValues } from "~/lib/validators/driver-form";
+import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
+import type { VersionOneDriverCSV } from "~/types/parsing";
 import {
   milesToMeters,
   militaryTimeToUnixSeconds,

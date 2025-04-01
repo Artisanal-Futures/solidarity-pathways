@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import { Trash } from "lucide-react";
 
 import {
@@ -15,15 +16,22 @@ import { Button } from "~/components/ui/button";
 
 type Props = {
   onConfirm: () => void;
+  Icon?: LucideIcon;
+  title?: string;
 };
 
-export const DeleteDialog = ({ onConfirm }: Props) => {
+export const DeleteDialog = ({ onConfirm, Icon, title }: Props) => {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" type="button" size="icon">
-          <Trash className="h-4 w-4" />
-          <span className="sr-only">Delete</span>
+        <Button
+          variant="destructive"
+          type="button"
+          size={title ? "sm" : "icon"}
+        >
+          {Icon ? <Icon className="h-4 w-4" /> : <Trash className="h-4 w-4" />}
+          {title}
+          <span className="sr-only">{title ?? "Delete"}</span>
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>

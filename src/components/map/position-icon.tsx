@@ -6,10 +6,8 @@ export const PositionIcon = () => {
     width: 1.25rem;
     height: 1.25rem;
     display: block;
-   border-radius: 100%;
+    border-radius: 100%;
     position: relative;
-  
-  
     box-shadow: 0 0 #0000, 0 0 #0000, 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
     border: 2px solid #FFFFFF`;
 

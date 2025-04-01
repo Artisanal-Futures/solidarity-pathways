@@ -1,5 +1,12 @@
-import { useState } from "react";
+"use client";
 
+import { useState } from "react";
+import { ArrowRight, Eye, Loader2, Send } from "lucide-react";
+
+import { api } from "~/trpc/react";
+import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
+import { useUrlParams } from "~/hooks/use-url-params";
+import { Button } from "~/components/ui/button";
 import {
   Drawer,
   DrawerClose,
@@ -10,22 +17,21 @@ import {
 } from "~/components/ui/drawer";
 import { ScrollArea } from "~/components/ui/scroll-area";
 
-import { ArrowRight, Eye, Loader2, Send } from "lucide-react";
-import { Button } from "~/components/ui/button";
-import { useUrlParams } from "~/hooks/use-url-params";
-
 import { useRoutePlans } from "../../hooks/plans/use-route-plans";
 import { useMassMessage } from "../../hooks/use-mass-message";
-
-import CalculationsTab from "../route-plan-section/calculations-tab";
+import { CalculationsTab } from "../route-plan-section/calculations-tab";
 
 export const ViewPathsMobileDrawer = () => {
   const { isLoading, massSendRouteEmails } = useMassMessage();
 
-  const { updateUrlParams } = useUrlParams();
-  const { getRoutePlanData, calculate } = useRoutePlans();
+  const { routeId } = useSolidarityState();
 
-  const optimized = getRoutePlanData.data?.optimizedRoute ?? [];
+  const getRoutePlanData = api.routePlan.get.useQuery(routeId, {
+    enabled: false,
+  });
+
+  const { updateUrlParams } = useUrlParams();
+  const { calculate, optimized } = useRoutePlans();
 
   const isRouteDataMissing =
     getRoutePlanData.data?.jobs.length === 0 ||
@@ -62,9 +68,9 @@ export const ViewPathsMobileDrawer = () => {
           <Eye /> View Routes
         </Button>
       </DrawerTrigger>
-      <DrawerContent className=" max-h-screen ">
+      <DrawerContent className="max-h-screen">
         <DrawerHeader />
-        <ScrollArea className="mx-auto flex w-full  max-w-sm flex-col">
+        <ScrollArea className="mx-auto flex w-full max-w-sm flex-col">
           <CalculationsTab />
         </ScrollArea>
 
@@ -75,9 +81,9 @@ export const ViewPathsMobileDrawer = () => {
             disabled={isLoading}
           >
             {isLoading ? (
-              <Loader2 className=" h-5 w-5 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
-              <Send className=" h-5 w-5" />
+              <Send className="h-5 w-5" />
             )}
             Send to Driver(s)
           </Button>

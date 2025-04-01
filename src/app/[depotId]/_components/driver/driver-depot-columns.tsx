@@ -3,7 +3,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
-import * as React from "react";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 
 import type { ColumnDef } from "@tanstack/react-table";
@@ -18,7 +17,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { DataEditOption } from "~/app/_components/data-sheet/data-edit-option";
+import { DataEditOption } from "~/components/shared/data-sheet/data-edit-option";
 
 import { DriverDepotDeleteOption } from "./driver-depot-delete-option";
 

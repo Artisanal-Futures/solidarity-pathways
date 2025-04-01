@@ -1,12 +1,13 @@
-import { jobTypeSchema } from "~/types.wip";
 import { uniqueId } from "lodash";
 
 import type { ClientJobBundle } from "~/lib/validators/client-job";
-import type { StopFormValues, VersionOneClientCSV } from "~/types.wip";
+import type { StopFormValues } from "~/lib/validators/stop";
+import type { VersionOneClientCSV } from "~/types/parsing";
 import {
   militaryTimeToUnixSeconds,
   minutesToSeconds,
 } from "~/utils/generic/format-utils.wip";
+import { jobTypeSchema } from "~/lib/validators/client-job";
 
 export const formatJobFormDataToBundle = (
   data: StopFormValues,

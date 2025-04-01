@@ -1,11 +1,15 @@
+"use client";
+
 import type { SelectSingleEventHandler } from "react-day-picker";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
 
+import { checkIfDateIsValid } from "~/lib/helpers/check-if-date-valid";
 import { cn } from "~/lib/utils";
-import { useReadRoutePlans } from "~/hooks/plans/use-read-route-plans";
-import { useRoutePlans } from "~/hooks/plans/use-route-plans";
+import { api } from "~/trpc/react";
+import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
+import { useFixDismissibleLayer } from "~/hooks/use-fix-dismissible-layer";
 import { Button } from "~/components/ui/button";
 import { Calendar } from "~/components/ui/calendar";
 import {
@@ -19,24 +23,26 @@ type Props = {
   setDate: SelectSingleEventHandler;
 };
 export const JobDepotPreviousRouteSelect = ({ date, setDate }: Props) => {
-  const { allRoutes } = useRoutePlans();
   const [open, setOpen] = useState(false);
-  const dateMap = allRoutes.map((route) => route.deliveryAt);
 
-  const { currentRoute } = useReadRoutePlans();
+  const { routeId, depotId } = useSolidarityState();
 
-  // Workaround for overlapping @radix-ui/react-dismissable-layers
-  useEffect(() => {
-    setTimeout(() => {
-      document.body.style.pointerEvents = "";
-    }, 500);
-  }, []);
+  const getAllRoutes = api.routePlan.getAll.useQuery(depotId, {
+    enabled: !!depotId,
+  });
 
-  const checkIfDateIsValid = (date: Date) => {
-    return (
-      date > new Date() ||
-      date < new Date("2024-01-01") ||
-      date.getDate() === currentRoute?.deliveryAt.getDate()
+  const dateMap = getAllRoutes?.data?.map((route) => route.deliveryAt);
+
+  const currentRoute = api.routePlan.get.useQuery(routeId, {
+    enabled: !!routeId,
+  });
+
+  useFixDismissibleLayer();
+
+  const disableInvalidDates = (date: Date) => {
+    return checkIfDateIsValid(
+      date,
+      currentRoute?.data?.deliveryAt ?? new Date(),
     );
   };
 
@@ -60,7 +66,7 @@ export const JobDepotPreviousRouteSelect = ({ date, setDate }: Props) => {
           selected={date}
           onSelect={setDate}
           className="rounded-md border"
-          disabled={checkIfDateIsValid}
+          disabled={disableInvalidDates}
           modifiers={{ route: dateMap ?? [] }}
           modifiersClassNames={{
             route:

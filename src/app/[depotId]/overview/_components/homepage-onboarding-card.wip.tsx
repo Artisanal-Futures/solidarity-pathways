@@ -1,10 +1,14 @@
+"use client";
+
 import { useMemo } from "react";
-import { formatNthDate, isDateToday } from "~/utils/current-date";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 
+import { formatNthDate, isDateToday } from "~/lib/helpers/current-date";
+import { api } from "~/trpc/react";
 import { useDepot } from "~/hooks/depot/use-depot";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
-import { useRoutePlans } from "~/hooks/plans/use-route-plans";
+import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -21,12 +25,24 @@ import { HomepageJobImportCard } from "./homepage-job-import-card";
 export const HomePageOnboardingCard = () => {
   const { depotId, isFirstTime, sessionStatus, routeDate } =
     useSolidarityState();
+  const router = useRouter();
+
+  const { defaultActions } = useDefaultMutationActions({
+    invalidateEntities: ["routePlan", "job", "vehicle"],
+  });
 
   const { currentDepot } = useDepot();
 
-  const { create: createRoute } = useRoutePlans();
+  const createRoutePlan = api.routePlan.create.useMutation({
+    ...defaultActions,
+    onSuccess: ({ data, message }) => {
+      defaultActions.onSuccess({ message });
+      void router.push(`/${depotId}/route/${data.id}?mode=plan`);
+    },
+  });
 
-  const manuallyCreateRoute = () => createRoute({ depotId, date: routeDate });
+  const manuallyCreateRoute = () =>
+    createRoutePlan.mutate({ depotId, date: routeDate });
 
   const dateTitle = useMemo(
     () => (isDateToday(routeDate) ? "Today's" : formatNthDate(routeDate)),

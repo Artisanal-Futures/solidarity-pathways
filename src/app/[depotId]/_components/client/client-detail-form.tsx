@@ -5,9 +5,8 @@ import { UserPlus } from "lucide-react";
 
 import { toastService } from "@dreamwalker-studios/toasts";
 
-import type { ClientJobBundle } from "~/lib/validators/client-job";
 import type { StopFormValues } from "~/lib/validators/stop";
-import { checkIfClientExistsInRoute } from "~/lib/helpers/get-specfiic";
+import { findCustomerById } from "~/lib/helpers/find-customer-by-id";
 import { checkAndHighlightErrors } from "~/lib/helpers/highlight-errors";
 import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
@@ -81,28 +80,19 @@ export const ClientDetailsSection = ({ form, editClient }: Props) => {
               })) ?? []
             }
             onValueChange={(value) => {
-              const bundle = checkIfClientExistsInRoute({
+              const customer = findCustomerById({
                 id: value,
-                clientBundles:
-                  (getDepotClients?.data as unknown as ClientJobBundle[]) ?? [],
+                customers: getDepotClients?.data ?? [],
               });
 
-              if (bundle?.client) {
-                form.setValue("name", bundle?.client?.name);
-                form.setValue("phone", bundle?.client?.phone);
-                form.setValue("email", bundle?.client?.email);
-                form.setValue(
-                  "clientAddress.formatted",
-                  bundle?.client?.address?.formatted,
-                );
-                form.setValue(
-                  "clientAddress.latitude",
-                  bundle?.client?.address?.latitude,
-                );
-                form.setValue(
-                  "clientAddress.longitude",
-                  bundle?.client?.address?.longitude,
-                );
+              if (customer) {
+                form.setValue("name", customer?.name);
+                form.setValue("phone", customer?.phone);
+                form.setValue("email", customer?.email);
+              }
+
+              if (customer?.address) {
+                form.setValue("clientAddress", customer?.address);
               }
             }}
           />
