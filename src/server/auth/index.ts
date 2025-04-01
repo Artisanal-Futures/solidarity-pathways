@@ -28,26 +28,18 @@ const {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        domain: hostName,
+        domain: "." + hostName,
         secure: useSecureCookies,
       },
     },
-    callbackUrl: {
-      name: `${cookiePrefix}next-auth.callback-url`,
-      options: {
-        sameSite: "lax",
-        path: "/",
-        domain: hostName,
-        secure: useSecureCookies,
-      },
-    },
+
     csrfToken: {
       name: `${cookiePrefix}next-auth.csrf-token`,
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        domain: hostName,
+        domain: "." + hostName,
         secure: useSecureCookies,
       },
     },
