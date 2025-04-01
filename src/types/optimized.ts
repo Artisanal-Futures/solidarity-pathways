@@ -1,6 +1,6 @@
 import type { RouteStatus } from "@prisma/client";
 
-import { RouteData } from "./route";
+import type { RouteData } from "./route";
 
 export type OptimizedStop = {
   id: string;

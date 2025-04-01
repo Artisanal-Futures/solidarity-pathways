@@ -1,21 +1,20 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
-import {
-  createDriverVerificationCookie,
-  generateDriverPassCode,
-} from "~/utils/server/auth-driver-passcode";
+
+import { generateDriverPassCode } from "~/utils/server/auth-driver-passcode";
+
 import { OptimizedPathClient } from "./_components/path-client";
 
 export default async function PathPage({
   params,
   searchParams,
 }: {
-  params: { depotId: string; routeId: string; pathId: string };
-  searchParams: { pc?: string; driverId?: string };
+  params: Promise<{ depotId: string; routeId: string; pathId: string }>;
+  searchParams: Promise<{ pc?: string; driverId?: string }>;
 }) {
+  const { depotId, pathId } = await params;
   const session = await auth();
 
   if (!session) return redirect("/sandbox");
@@ -25,7 +24,7 @@ export default async function PathPage({
   if (!session?.user) return redirect("/sandbox");
 
   const depot = await db.depot.findUnique({
-    where: { id: params.depotId },
+    where: { id: depotId },
   });
 
   if (!depot) return redirect("/");
@@ -35,22 +34,22 @@ export default async function PathPage({
   if (!isOwner) return redirect("/unauthorized");
 
   // Handle driver verification
-  const { pc: passcode } = searchParams;
+  const { pc: passcode, driverId } = await searchParams;
   const cookieStore = await cookies();
   const verifiedDriverCookie = cookieStore.get("verifiedDriver")?.value;
   let verifiedDriver: string | null = null;
 
   if (passcode || verifiedDriverCookie) {
     try {
-      if (searchParams.driverId) {
+      if (driverId) {
         const driver = await db.vehicle.findUnique({
-          where: { id: searchParams.driverId },
+          where: { id: driverId },
           include: { driver: true },
         });
 
         if (driver && driver.driver) {
           const expectedPasscode = generateDriverPassCode({
-            pathId: params.pathId,
+            pathId,
             depotCode: depot.magicCode,
             email: driver.driver.email,
           });

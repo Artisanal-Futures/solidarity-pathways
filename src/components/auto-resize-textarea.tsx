@@ -1,6 +1,9 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
+
 import * as React from "react";
 import { useImperativeHandle } from "react";
+
 import { cn } from "~/lib/utils";
 
 interface UseAutoResizeTextAreaProps {

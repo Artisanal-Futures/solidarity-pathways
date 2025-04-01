@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { clientJobUploadOptions } from "~/data/stop-data";

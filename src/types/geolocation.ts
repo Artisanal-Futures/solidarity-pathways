@@ -1,5 +1,5 @@
-import { SummaryData, UnassignedData } from "./optimized";
-import { RouteData } from "./route";
+import type { SummaryData, UnassignedData } from "./optimized";
+import type { RouteData } from "./route";
 
 export type Coordinates = {
   latitude: number;

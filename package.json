@@ -81,6 +81,8 @@
     "react-leaflet": "^5.0.0",
     "react-number-format": "^5.4.3",
     "react-spinners": "^0.15.0",
+    "resend": "^4.2.0",
+    "responsive-react-email": "^0.0.5",
     "server-only": "^0.0.1",
     "sonner": "^2.0.1",
     "superjson": "^2.2.1",

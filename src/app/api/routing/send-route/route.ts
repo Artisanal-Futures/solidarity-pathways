@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { NextResponse } from "next/server";
 import { emailService } from "~/services/email";
+import NewRouteTemplate from "~/services/email/email-templates/new-route-template";
 
 export async function POST(request: Request) {
   try {
@@ -16,7 +17,11 @@ export async function POST(request: Request) {
     const data = await Promise.all(
       emailBundles.map(
         async (bundle: { email: string; url: string; passcode: string }) => {
-          const emailData = await emailService.sendRoute({
+          const emailData = await emailService.sendEmail({
+            from: "Artisanal Futures <no-reply@artisanalfutures.org>",
+            to: bundle.email,
+            subject: "New Route Assignment from Solidarity Pathways",
+            template: NewRouteTemplate,
             data: {
               email: bundle.email,
               loginCode: bundle.passcode,

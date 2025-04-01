@@ -1,5 +1,4 @@
 import type { LucideIcon } from "lucide-react";
-import { cva } from "class-variance-authority";
 import { divIcon } from "leaflet";
 import ReactDOMServer from "react-dom/server";
 

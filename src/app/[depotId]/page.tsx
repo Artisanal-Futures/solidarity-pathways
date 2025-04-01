@@ -1,14 +1,15 @@
 import { redirect } from "next/navigation";
-
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
 
 export default async function DepotHomePage({
   params,
 }: {
-  params: { depotId: string };
+  params: Promise<{ depotId: string }>;
 }) {
   const session = await auth();
+
+  const { depotId } = await params;
 
   if (!session?.user) {
     redirect("/sandbox");
@@ -19,7 +20,7 @@ export default async function DepotHomePage({
   const depot = await db.depot.findUnique({
     where: {
       ownerId: userId,
-      id: params.depotId,
+      id: depotId,
     },
   });
 
