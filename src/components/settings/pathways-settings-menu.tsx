@@ -1,12 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bomb, Truck, User } from "lucide-react";
+import { Bomb, Settings, Truck, User } from "lucide-react";
 
 import { DialogClose } from "@radix-ui/react-dialog";
 
+import type { ButtonProps } from "~/components/ui/button";
+import { cn } from "~/lib/utils";
 import { api } from "~/trpc/react";
 import { useDepot } from "~/hooks/depot/use-depot";
 import { useDepotModal } from "~/hooks/depot/use-depot-modal.wip";
@@ -27,7 +28,14 @@ import { ScrollArea } from "~/components/ui/scroll-area";
 import { DeleteDialog } from "../delete-dialog";
 import { DepotModal } from "./depot-modal";
 
-export const PathwaysSettingsMenu = ({ children }: { children: ReactNode }) => {
+type Props = {
+  buttonClassName?: string;
+  buttonVariant?: ButtonProps["variant"];
+};
+export const PathwaysSettingsMenu = ({
+  buttonClassName,
+  buttonVariant,
+}: Props) => {
   const [open, setOpen] = useState(false);
 
   const { defaultActions } = useDefaultMutationActions({
@@ -52,7 +60,15 @@ export const PathwaysSettingsMenu = ({ children }: { children: ReactNode }) => {
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>{children}</DialogTrigger>
+        <DialogTrigger asChild>
+          <Button
+            className={cn(buttonClassName)}
+            variant={buttonVariant ?? "ghost"}
+          >
+            <Settings />
+            {buttonVariant === "link" && "Settings"}
+          </Button>
+        </DialogTrigger>
         <DialogContent className="w-full max-w-2xl">
           <DialogHeader>
             <DialogTitle>Solidarity Pathways Settings</DialogTitle>

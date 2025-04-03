@@ -1,7 +1,9 @@
 "use client";
 
 import type { UseFormReturn } from "react-hook-form";
-import { UserPlus } from "lucide-react";
+import { useState } from "react";
+import { useClient } from "~/providers/client";
+import { Edit, UserPlus } from "lucide-react";
 
 import { toastService } from "@dreamwalker-studios/toasts";
 
@@ -17,6 +19,14 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { Button } from "~/components/ui/button";
+import {
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "~/components/ui/form";
+import { Input } from "~/components/ui/input";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Separator } from "~/components/ui/separator";
 import {
@@ -26,142 +36,265 @@ import {
   TextareaFormField,
 } from "~/components/inputs";
 
-type Props = {
-  form: UseFormReturn<StopFormValues>;
-  editClient?: boolean;
-};
+interface Address {
+  formatted?: string;
+  latitude?: number;
+  longitude?: number;
+}
 
-export const ClientDetailsSection = ({ form, editClient }: Props) => {
+interface ClientDetailsSectionProps {
+  form: UseFormReturn<StopFormValues>;
+  editClient: boolean;
+  onClientModeChange?: (mode: "select" | "create" | "edit") => void;
+}
+
+export const ClientDetailsSection = ({
+  form,
+  editClient,
+  onClientModeChange,
+}: ClientDetailsSectionProps) => {
   const highlightErrors = checkAndHighlightErrors({
     form,
     keys: ["clientAddress.formatted", "name", "email", "phone", "notes"],
   });
 
   const { depotId, depotMode } = useSolidarityState();
+  const [clientMode, setClientMode] = useState<"select" | "create" | "edit">(
+    editClient ? "edit" : "select",
+  );
+  const [isEditing, setIsEditing] = useState(editClient);
+  const [previousClientId, setPreviousClientId] = useState<string | undefined>(
+    form.getValues("clientId"),
+  );
+
+  const { activeJobData } = useClient();
   const getDepotClients = api.customer.getAll.useQuery(depotId, {
     enabled: !!depotId && !!depotMode && depotMode !== "calculate",
   });
 
   const isClientAssigned = form.watch("clientId") !== undefined;
-
+  const isNewJob = !activeJobData;
   const clientAddress = form.watch("clientAddress");
-  return (
-    <AccordionItem value="item-2" className="group">
-      <AccordionTrigger
-        className={cn("px-2 text-lg", highlightErrors && "text-red-500")}
-      >
-        Client Details
-      </AccordionTrigger>
+  const clientName = form.watch("name");
+  const isJobNumberName = form.watch("id")?.includes("job_");
 
-      <ScrollArea
-        className={cn(
-          "transition-all duration-200 ease-in-out group-data-[state=closed]:h-[0vh] group-data-[state=closed]:opacity-0",
-          "group-data-[state=open]:h-[35vh] group-data-[state=open]:opacity-100",
-        )}
-      >
-        <AccordionContent className="px-2">
-          {isClientAssigned && (
-            <p className="mb-4 leading-7 [&:not(:first-child)]:mt-6">
-              You can reassign a client to this job:
-            </p>
+  const handleClientSelect = (clientId: string) => {
+    const selectedClient = getDepotClients?.data?.find(
+      (c) => c.id === clientId,
+    );
+    if (selectedClient) {
+      form.setValue("clientId", clientId);
+      form.setValue("name", selectedClient.name);
+      form.setValue("email", selectedClient.email ?? undefined);
+      form.setValue("phone", selectedClient.phone ?? undefined);
+      if (selectedClient.address) {
+        form.setValue("clientAddress", {
+          formatted: selectedClient.address.formatted,
+          latitude: selectedClient.address.latitude,
+          longitude: selectedClient.address.longitude,
+        });
+      }
+      setClientMode("select");
+      onClientModeChange?.("select");
+    }
+  };
+
+  const handleCreateNewClient = () => {
+    setPreviousClientId(form.getValues("clientId"));
+    form.setValue("clientId", undefined);
+    form.setValue("name", "");
+    form.setValue("email", undefined);
+    form.setValue("phone", undefined);
+    form.setValue("clientAddress", {
+      formatted: "",
+      latitude: 0,
+      longitude: 0,
+    });
+    setClientMode("create");
+    onClientModeChange?.("create");
+  };
+
+  const handleCancelCreate = () => {
+    if (previousClientId) {
+      const previousClient = getDepotClients?.data?.find(
+        (c) => c.id === previousClientId,
+      );
+      if (previousClient) {
+        form.setValue("clientId", previousClientId);
+        form.setValue("name", previousClient.name);
+        form.setValue("email", previousClient.email ?? undefined);
+        form.setValue("phone", previousClient.phone ?? undefined);
+        if (previousClient.address) {
+          form.setValue("clientAddress", {
+            formatted: previousClient.address.formatted,
+            latitude: previousClient.address.latitude,
+            longitude: previousClient.address.longitude,
+          });
+        }
+      }
+    }
+    setClientMode("select");
+    onClientModeChange?.("select");
+  };
+
+  const handleEditClient = () => {
+    setIsEditing(true);
+    setClientMode("edit");
+    onClientModeChange?.("edit");
+  };
+
+  const handleCancelEdit = () => {
+    const currentClientId = form.getValues("clientId");
+    if (currentClientId) {
+      const currentClient = getDepotClients?.data?.find(
+        (c) => c.id === currentClientId,
+      );
+      if (currentClient) {
+        form.setValue("name", currentClient.name);
+        form.setValue("email", currentClient.email ?? undefined);
+        form.setValue("phone", currentClient.phone ?? undefined);
+        if (currentClient.address) {
+          form.setValue("clientAddress", {
+            formatted: currentClient.address.formatted,
+            latitude: currentClient.address.latitude,
+            longitude: currentClient.address.longitude,
+          });
+        }
+      }
+    }
+    setIsEditing(false);
+    setClientMode("select");
+    onClientModeChange?.("select");
+  };
+
+  const showClientForm = () => clientMode === "create" || clientMode === "edit";
+
+  return (
+    <AccordionItem value="item-2">
+      <AccordionTrigger>Client Details</AccordionTrigger>
+      <AccordionContent>
+        <div className="space-y-4">
+          {/* Selection Mode */}
+          {clientMode === "select" && (
+            <>
+              <SelectFormField
+                form={form}
+                name="clientId"
+                label="Select Previous Client"
+                placeholder="Select a client"
+                values={
+                  getDepotClients?.data?.map((client) => ({
+                    label: client.name,
+                    value: client.id,
+                  })) ?? []
+                }
+                onValueChange={handleClientSelect}
+                disabled={isEditing}
+              />
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCreateNewClient}
+                >
+                  Create New Client
+                </Button>
+                {form.getValues("clientId") && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleEditClient}
+                  >
+                    Edit Current Client
+                  </Button>
+                )}
+              </div>
+            </>
           )}
 
-          <SelectFormField
-            form={form}
-            disabled={getDepotClients?.data?.length === 0}
-            name="clientId"
-            label="Client"
-            description="Select a client to assign to this job"
-            labelClassName="text-sm font-normal text-muted-foreground"
-            values={
-              getDepotClients?.data?.map((client) => ({
-                label: `${client.name}: ${client?.address?.formatted}`,
-                value: client.id,
-              })) ?? []
-            }
-            onValueChange={(value) => {
-              const customer = findCustomerById({
-                id: value,
-                customers: getDepotClients?.data ?? [],
-              });
+          {/* Create/Edit Mode */}
+          {(clientMode === "create" || clientMode === "edit") && (
+            <>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">
+                  {clientMode === "create"
+                    ? "Create New Client"
+                    : "Edit Client"}
+                </h3>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={
+                    clientMode === "create"
+                      ? handleCancelCreate
+                      : handleCancelEdit
+                  }
+                >
+                  Cancel
+                </Button>
+              </div>
 
-              if (customer) {
-                form.setValue("name", customer?.name);
-                form.setValue("phone", customer?.phone);
-                form.setValue("email", customer?.email);
-              }
+              <InputFormField
+                form={form}
+                name="name"
+                label="Full Name"
+                placeholder="Client's full name"
+                labelClassName="text-sm font-normal text-muted-foreground"
+              />
 
-              if (customer?.address) {
-                form.setValue("clientAddress", customer?.address);
-              }
-            }}
-          />
+              <AutoCompleteAddressFormField
+                form={form}
+                name="clientAddress.formatted"
+                labelClassName="text-sm font-normal text-muted-foreground"
+                label="Home Address"
+                description="This is where the client typically is located."
+                defaultValue={{
+                  formatted: clientAddress?.formatted ?? "",
+                  latitude: clientAddress?.latitude ?? 0,
+                  longitude: clientAddress?.longitude ?? 0,
+                }}
+                onSelectAdditional={(address) => {
+                  form.setValue("address", address);
+                }}
+              />
 
-          <>
-            {(form.watch("clientId") === undefined ||
-              (editClient && form.watch("clientId") !== undefined)) &&
-              !form.watch("name").includes("Job #") && (
-                <div className="flex flex-col space-y-4 pt-4">
-                  <Separator />
-                  <p className="text-lg font-semibold leading-7 [&:not(:first-child)]:mt-6">
-                    Edit {form.watch("name") ?? "client"}&apos;s details:
-                  </p>
+              <InputFormField
+                form={form}
+                name="email"
+                label="Email"
+                type="email"
+                placeholder="e.g. client@example.com"
+                labelClassName="text-sm font-normal text-muted-foreground"
+              />
 
-                  <InputFormField
-                    form={form}
-                    name="name"
-                    label="Full Name"
-                    placeholder="Your driver's name"
-                    labelClassName="text-sm font-normal text-muted-foreground"
-                  />
+              <InputFormField
+                form={form}
+                name="phone"
+                label="Phone"
+                placeholder="e.g. (555) 123-4567"
+                labelClassName="text-sm font-normal text-muted-foreground"
+              />
 
-                  <AutoCompleteAddressFormField
-                    form={form}
-                    name="clientAddress.formatted"
-                    labelClassName="text-sm font-normal text-muted-foreground"
-                    label="Home Address"
-                    description="This is where the client typically is located."
-                    defaultValue={{
-                      formatted: clientAddress?.formatted ?? "",
-                      latitude: clientAddress?.latitude ?? 0,
-                      longitude: clientAddress?.longitude ?? 0,
-                    }}
-                  />
+              <TextareaFormField
+                form={form}
+                name="notes"
+                label="Notes (optional)"
+                placeholder="e.g. Special delivery instructions"
+                labelClassName="text-sm font-normal text-muted-foreground"
+              />
 
-                  <InputFormField
-                    form={form}
-                    name="email"
-                    label="Email"
-                    type="email"
-                    placeholder="e.g. test@test.com"
-                    labelClassName="text-sm font-normal text-muted-foreground"
-                  />
-
-                  {/* className="resize-none" */}
-                  <TextareaFormField
-                    form={form}
-                    name="notes"
-                    label="Notes (optional)"
-                    placeholder="e.g. Two boxes of squash"
-                    labelClassName="text-sm font-normal text-muted-foreground"
-                  />
-                </div>
+              {clientMode === "edit" && (
+                <p className="text-sm text-muted-foreground">
+                  Changes will be saved when you update the stop. Click
+                  &quot;Cancel&quot; to discard changes.
+                </p>
               )}
-          </>
-
-          <p className="leading-7 [&:not(:first-child)]:mt-6">
-            Or create a new one:
-          </p>
-          <Button
-            className="flex gap-2"
-            type="button"
-            onClick={() => toastService.inform("TODO: Add new client modal")}
-          >
-            <UserPlus className="h-4 w-4" />
-            Create a new client
-          </Button>
-        </AccordionContent>
-      </ScrollArea>
+            </>
+          )}
+        </div>
+      </AccordionContent>
     </AccordionItem>
   );
 };

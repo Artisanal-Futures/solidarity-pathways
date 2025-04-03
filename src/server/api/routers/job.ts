@@ -133,7 +133,7 @@ export const jobRouter = createTRPCRouter({
         db: ctx.db,
         clientJob: {
           job: clientJob.job,
-          client: clientJob.client?.email ? clientJob.client : undefined,
+          client: clientJob?.client?.email ? clientJob?.client : undefined,
         },
         depotId: input.depotId,
         routeId: input.routeId,
@@ -353,7 +353,6 @@ const createJob = async ({
   routeId: string | undefined;
 }) => {
   const { address, ...jobData } = clientJob.job;
-  const { ...clientData } = clientJob.client;
 
   const job = await db.job.create({
     data: {
@@ -379,7 +378,7 @@ const createJob = async ({
         where: { email: clientJob.client.email },
         update: {},
         create: {
-          ...clientData,
+          ...clientJob?.client,
           address: { connect: { id: addressOfClient.id } },
           depotId,
         },

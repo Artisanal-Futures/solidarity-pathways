@@ -42,8 +42,8 @@ export const vehicleSchema = z.object({
   maxDistance: z.number().optional(),
   shiftStart: z.number(),
   shiftEnd: z.number(),
-  notes: z.string().optional(),
-  cargo: z.string().optional(),
+  notes: z.string().optional().nullable(),
+  cargo: z.string().optional().nullable(),
   breaks: z
     .array(
       z.object({

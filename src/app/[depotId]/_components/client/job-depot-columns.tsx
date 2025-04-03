@@ -2,25 +2,24 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-return */
 
-import { ArrowUpDown, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 
-import type { Address } from "@prisma/client";
 import type { ColumnDef } from "@tanstack/react-table";
 
 import type { ClientJobBundle } from "~/lib/validators/client-job";
 import { Button } from "~/components/ui/button";
 import { Checkbox } from "~/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
-import { DataEditOption } from "~/components/shared/data-sheet/data-edit-option";
+import { DataTableRowOptions } from "~/components/shared/data-sheet/data-table-row-options";
 
-export const jobDepotColumns: ColumnDef<ClientJobBundle>[] = [
+type DataColumn = {
+  id: string;
+  name: string;
+  type?: string;
+  address: string;
+  bundle: Partial<ClientJobBundle>;
+};
+
+export const jobDepotColumns: ColumnDef<DataColumn>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -45,7 +44,7 @@ export const jobDepotColumns: ColumnDef<ClientJobBundle>[] = [
   },
 
   {
-    accessorKey: "client.name",
+    accessorKey: "name",
     header: ({ column }) => {
       return (
         <Button
@@ -58,13 +57,11 @@ export const jobDepotColumns: ColumnDef<ClientJobBundle>[] = [
       );
     },
     cell: ({ row }) => (
-      <div className="capitalize">
-        {row.original?.client?.name ?? "Unsaved Client"}
-      </div>
+      <div className="capitalize">{row.original?.name ?? "Unsaved Client"}</div>
     ),
   },
   {
-    accessorKey: "job.type",
+    accessorKey: "type",
     filterFn: (row, id, value) => {
       return value.includes(row.getValue(id));
     },
@@ -79,17 +76,15 @@ export const jobDepotColumns: ColumnDef<ClientJobBundle>[] = [
         </Button>
       );
     },
-    cell: ({ row }) => (
-      <div className="capitalize">{row.original.job.type}</div>
-    ),
+    cell: ({ row }) => <div className="capitalize">{row.original.type}</div>,
   },
   {
-    accessorKey: "job.address",
+    accessorKey: "address",
 
     filterFn: (row, id, value) => {
-      const address: Address = row.getValue(id);
+      const address = row.getValue(id);
 
-      return address.formatted
+      return (address as string)
         .toLowerCase()
         .includes(value.toLowerCase() as string);
     },
@@ -105,37 +100,16 @@ export const jobDepotColumns: ColumnDef<ClientJobBundle>[] = [
       );
     },
     cell: ({ row }) => (
-      <div className="capitalize">{row.original?.job.address.formatted}</div>
+      <div className="capitalize">{row.original?.address}</div>
     ),
   },
   {
     id: "actions",
     enableHiding: false,
     cell: ({ row }) => {
-      const job = row.original;
+      const jobBundle = row.original;
 
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => void navigator.clipboard.writeText(job.job.id)}
-            >
-              Copy ID
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <DataEditOption id={job.job.id} type="job" />
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
+      return <DataTableRowOptions id={jobBundle?.id} type="job" />;
     },
   },
 ];

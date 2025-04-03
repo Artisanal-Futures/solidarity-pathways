@@ -16,7 +16,10 @@ import type {
 import type { OptimizedResponseData } from "~/types/optimized";
 import { env } from "~/env";
 import { formatGeometry } from "~/lib/optimization/vroom-optimization";
-import { clientJobSchema } from "~/lib/validators/client-job";
+import {
+  clientJobOptimizationSchema,
+  clientJobSchema,
+} from "~/lib/validators/client-job";
 import { driverVehicleSchema } from "~/lib/validators/driver-vehicle";
 import {
   vroomDataSchema,
@@ -99,7 +102,7 @@ export const routeOptimizationRouter = createTRPCRouter({
     }),
 
   formatClient: protectedProcedure
-    .input(z.object({ data: z.array(clientJobSchema) }))
+    .input(z.object({ data: z.array(clientJobOptimizationSchema) }))
     .mutation(async ({ input }) => {
       const convertClientToJob = (bundle: ClientJobBundle) => {
         return {

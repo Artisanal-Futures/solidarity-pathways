@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useDriver } from "~/providers/driver";
+import { Copy } from "lucide-react";
+
+import { toastService } from "@dreamwalker-studios/toasts";
 
 import type { OptimizedRoutePath } from "~/types/route";
 import type { OptimizedStop } from "~/types/stop";
@@ -62,18 +65,38 @@ export const AssignedJobSheet = ({ data }: Props) => {
       })
     : "";
 
+  const routeUrl = `/${depotId}/route/${data.routeId}/path/${data.id}?driverId=${data.vehicleId}&pc=${passcode}`;
+
+  const handleCopyRoute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    void navigator.clipboard.writeText(window.location.origin + routeUrl);
+    toastService.success("Route URL copied to clipboard");
+  };
+
   return (
     <>
       <Sheet onOpenChange={onRouteSheetOpenChange} open={open}>
         <SheetTrigger asChild>
-          <Button
-            variant={"ghost"}
-            className="my-2 ml-auto flex h-auto w-full p-0 text-left"
-          >
-            <Card className={cn("w-full hover:bg-slate-50", "")}>
-              <AssignedJobHeaderCard {...headerData} />
-            </Card>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={"ghost"}
+              className="my-2 flex h-auto w-full p-0 text-left"
+            >
+              <Card className={cn("w-full hover:bg-slate-50", "")}>
+                <AssignedJobHeaderCard {...headerData} />
+              </Card>
+            </Button>
+            <div className="flex flex-col gap-2">
+              <Link href={routeUrl} target="_blank">
+                <Button variant="outline" size="sm">
+                  View
+                </Button>
+              </Link>
+              <Button variant="outline" size="sm" onClick={handleCopyRoute}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </SheetTrigger>
 
         {data && (
@@ -87,10 +110,7 @@ export const AssignedJobSheet = ({ data }: Props) => {
               driver={driver}
             />
             <SheetFooter className="flex flex-row gap-2">
-              <Link
-                href={`/${depotId}/route/${data.routeId}/path/${data.id}?driverId=${data.vehicleId}&pc=${passcode}`}
-                target="_blank"
-              >
+              <Link href={routeUrl} target="_blank">
                 <Button className="">View Route</Button>
               </Link>
             </SheetFooter>

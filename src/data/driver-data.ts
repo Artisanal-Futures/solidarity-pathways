@@ -1,6 +1,9 @@
 import { uniqueId } from "lodash";
 
-import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
+import type {
+  DriverVehicleBundle,
+  NewDriverVehicleBundle,
+} from "~/lib/validators/driver-vehicle";
 import type { UploadOptions } from "~/types/misc";
 import { handleDriverSheetUpload } from "~/utils/driver-vehicle/parse-drivers.wip";
 import {
@@ -24,11 +27,11 @@ type Props = {
 export const driverVehicleDataForNewLatLng = (
   lat: number,
   lng: number,
-): DriverVehicleBundle => {
+): NewDriverVehicleBundle => {
   return {
     driver: {
       type: "FULL_TIME",
-      id: uniqueId("driver_"),
+
       name: "New Driver",
       email: "default@example.com",
       phone: "",
@@ -40,7 +43,6 @@ export const driverVehicleDataForNewLatLng = (
       },
     },
     vehicle: {
-      id: uniqueId("vehicle_"),
       startAddress: {
         formatted: "Address via LatLng",
         latitude: lat,
@@ -51,7 +53,7 @@ export const driverVehicleDataForNewLatLng = (
         latitude: lat,
         longitude: lng,
       },
-      type: driverTypeSchema.parse("TEMP"),
+
       shiftStart: driverVehicleDefaults.shiftStart,
       shiftEnd: driverVehicleDefaults.shiftEnd,
       breaks: driverVehicleDefaults.breaks,

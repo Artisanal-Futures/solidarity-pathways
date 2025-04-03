@@ -1,3 +1,5 @@
+"use client";
+
 import type { DivIcon } from "leaflet";
 import type { MarkerProps } from "react-leaflet";
 import { useMemo } from "react";
@@ -60,6 +62,19 @@ export const RouteMarker = ({
       }
     }
   }, [variant, calculatedColor, stopId, useThisIconInstead]);
+
+  // Check if position is valid before rendering
+  if (
+    !position ||
+    (typeof position === "object" &&
+      (Array.isArray(position)
+        ? position[0] === undefined || position[1] === undefined
+        : "lat" in position && "lng" in position
+          ? false
+          : true))
+  ) {
+    return null;
+  }
 
   return (
     <Marker

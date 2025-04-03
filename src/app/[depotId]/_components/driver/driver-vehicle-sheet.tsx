@@ -8,7 +8,6 @@ import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
 import { api } from "~/trpc/react";
 import { useSolidarityState } from "~/hooks/optimized-data/use-solidarity-state";
 import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
-import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import {
   Sheet,
@@ -16,7 +15,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "~/components/map-sheet";
-import { DataTable } from "~/components/shared/data-sheet/data-table";
+import { LoadButton } from "~/components/shared/load-button";
+import { AdvancedDataTable } from "~/app/_components/tables/advanced-data-table";
 import { DriverForm } from "~/app/[depotId]/_components/driver/driver-form";
 
 import { driverDepotColumns } from "./driver-depot-columns";
@@ -72,6 +72,18 @@ export const DriverVehicleSheet: FC<Props> = ({ standalone }) => {
     });
   };
 
+  const formattedDepotDrivers =
+    getDepotDrivers?.data?.map((row) => ({
+      id: row.driver?.id ?? "",
+      name: row.driver?.name ?? "",
+      type: row.driver?.type,
+      bundle: {
+        driver: row.driver ?? {},
+        vehicle: row.vehicle ?? {},
+      },
+    })) ?? [];
+
+  const preSelectedRows = getRouteVehicles?.data?.map((row) => row.driver?.id);
   return (
     <Sheet open={isDriverSheetOpen} onOpenChange={onSheetOpenChange}>
       <SheetContent
@@ -108,22 +120,32 @@ export const DriverVehicleSheet: FC<Props> = ({ standalone }) => {
               </TabsList>
 
               <TabsContent value="depotDrivers">
-                <Button
+                <LoadButton
                   className="my-3 w-full p-4"
                   onClick={assignVehiclesToRoute}
+                  isLoading={overrideCurrentRoutes.isPending}
+                  loadingText="Updating route drivers..."
                 >
                   Update route drivers
-                </Button>
-
-                <DataTable
-                  storeData={getRouteVehicles?.data ?? []}
-                  data={getDepotDrivers?.data ?? []}
-                  setSelectedData={setSelectedData}
-                  idAccessor={(row) => row.driver?.id}
-                  accessorKey="driver_name"
+                </LoadButton>
+                <AdvancedDataTable
+                  searchKey="name"
+                  searchPlaceholder="Search drivers by name..."
                   columns={driverDepotColumns}
-                  type="driver"
-                  searchPlaceholder="Search drivers..."
+                  data={formattedDepotDrivers}
+                  preSelectAccessor="id"
+                  preSelectedDataIds={preSelectedRows ?? []}
+                  setSelectedData={(data) => {
+                    // Convert the data format to match what setSelectedData expects
+                    const formattedData = data.map((item) => ({
+                      driver: item.driver ?? {},
+                      vehicle: item.vehicle ?? {},
+                    }));
+                    setSelectedData(formattedData as DriverVehicleBundle[]);
+
+                    console.log(formattedData);
+                  }}
+                  postSelectAccessor="bundle"
                 />
               </TabsContent>
               <TabsContent value="newDriver">

@@ -33,6 +33,7 @@ type Props<CurrentForm extends FieldValues> = {
   type?: string;
   defaultValue?: Address;
   children?: React.ReactNode;
+  onSelectAdditional?: (address: Address) => void;
 };
 
 export const AutoCompleteAddressFormField = <CurrentForm extends FieldValues>({
@@ -45,12 +46,14 @@ export const AutoCompleteAddressFormField = <CurrentForm extends FieldValues>({
   descriptionClassName,
   defaultValue,
   children,
+  onSelectAdditional,
 }: Props<CurrentForm>) => {
   const onAddressSelect = (address: Address) => {
     form.setValue(
       name.replace(".formatted", "") as Path<CurrentForm>,
       address as PathValue<CurrentForm, Path<CurrentForm>>,
     );
+    onSelectAdditional?.(address);
   };
 
   return (

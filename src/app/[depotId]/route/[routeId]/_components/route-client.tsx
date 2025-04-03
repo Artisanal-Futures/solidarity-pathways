@@ -15,6 +15,7 @@ import {
   PlusCircle,
   Rocket,
   Send,
+  Wifi,
 } from "lucide-react";
 
 // Route among lasso selections
@@ -53,7 +54,7 @@ const LazyRoutingMap = dynamic(() => import("~/components/map/routing-map"), {
  */
 export const RouteClient = () => {
   const { defaultActions } = useDefaultMutationActions({
-    invalidateEntities: ["routePlan"],
+    invalidateEntities: ["routePlan", "job", "customer", "vehicle", "driver"],
   });
 
   const { routeId, depotId } = useSolidarityState();
@@ -67,7 +68,7 @@ export const RouteClient = () => {
     ...defaultActions,
   });
 
-  const buildJobsMutation = api.clients.import.useMutation({
+  const buildJobsMutation = api.demo.import.useMutation({
     onSuccess: ({ data, message }) => {
       toastService.success(message);
 
@@ -93,7 +94,7 @@ export const RouteClient = () => {
       });
     },
     onError: (error) => toastService.error(error?.message),
-    onSettled: () => void apiContext.clients.invalidate(),
+    onSettled: () => void apiContext.demo.invalidate(),
   });
 
   const clearOptimizedStops =
@@ -280,7 +281,7 @@ export const RouteClient = () => {
               onClick={() => setShowAdvanced(!showAdvanced)}
               className="hover:bg-dark-gray bg-black text-white"
             >
-              <PencilIcon /> {showAdvanced ? "Close" : "Details"}
+              <PencilIcon /> {showAdvanced ? "Close" : "Manage"}
             </Button>
           </div>
 
@@ -312,13 +313,12 @@ export const RouteClient = () => {
 
           <div className="p-1">
             <Button
-              onClick={testSoketiConnection}
+              onClick={() => testSoketiConnection()}
               className="hover:bg-dark-gray bg-black text-white"
             >
-              <Bug /> Test Soketi
+              <Wifi /> Test Soketi
             </Button>
           </div>
-
           {/* Soketi Status Indicator */}
           <div className="p-1 text-xs">
             <div

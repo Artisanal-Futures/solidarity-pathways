@@ -2,9 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Settings } from "lucide-react";
 
-import { Button } from "~/components/ui/button";
 import { NavbarActions } from "~/components/layout/navbar-actions";
 
 import { useSolidarityState } from "../../hooks/optimized-data/use-solidarity-state";
@@ -42,13 +40,7 @@ export const Navbar = () => {
             </Link>
 
             <div className="ml-auto flex items-center space-x-6">
-              {!pathId && (
-                <PathwaysSettingsMenu>
-                  <Button variant={"ghost"} aria-label="Settings">
-                    <Settings />
-                  </Button>
-                </PathwaysSettingsMenu>
-              )}
+              {!pathId && <PathwaysSettingsMenu />}
 
               <NavbarActions />
             </div>

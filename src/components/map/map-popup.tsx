@@ -1,5 +1,8 @@
 "use client";
 
+import { useClient } from "~/providers/client";
+import { useDriver } from "~/providers/driver";
+
 import { api } from "~/trpc/react";
 import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 
@@ -15,6 +18,8 @@ const driver = "DRIVER";
 const client = "CLIENT";
 
 export const MapPopup = ({ name, address, id, kind }: Props) => {
+  const { openDriverEdit } = useDriver();
+  const { openJobEdit } = useClient();
   const { defaultActions } = useDefaultMutationActions({
     invalidateEntities: ["driver", "job", "routePlan"],
   });
@@ -33,6 +38,11 @@ export const MapPopup = ({ name, address, id, kind }: Props) => {
     }
   };
 
+  const handleEdit = async () => {
+    if (kind == driver) openDriverEdit(id);
+    if (kind == client) openJobEdit(id);
+  };
+
   return (
     <div className="flex flex-col space-y-2">
       <span className="block text-base font-bold capitalize">{name}</span>
@@ -40,12 +50,21 @@ export const MapPopup = ({ name, address, id, kind }: Props) => {
         <span className="block font-semibold text-slate-600">Location</span>
         {address}
       </span>
-      <span
-        className="mt-auto block cursor-pointer text-red-600"
-        onClick={handleDelete}
-      >
-        Delete
-      </span>
+      <div className="mt-auto flex items-center gap-4">
+        <span
+          className="block cursor-pointer text-red-600"
+          onClick={handleDelete}
+        >
+          Delete
+        </span>
+
+        <span
+          className="block cursor-pointer text-blue-600"
+          onClick={handleEdit}
+        >
+          Edit
+        </span>
+      </div>
     </div>
   );
 };

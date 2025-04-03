@@ -1,7 +1,7 @@
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 import { clientRouterAlt } from "./routers/client";
-import { clientRouter } from "./routers/clients";
+import { clientRouter } from "./routers/demo";
 import { depotRouter } from "./routers/depot";
 import { driverRouter } from "./routers/driver";
 import { geocodeRouter } from "./routers/geocode";
@@ -18,7 +18,7 @@ import { vehicleRouter } from "./routers/vehicle";
 export const appRouter = createTRPCRouter({
   routePlan: routePlanRouter,
 
-  clients: clientRouter,
+  demo: clientRouter,
 
   driver: driverRouter,
   vehicle: vehicleRouter,

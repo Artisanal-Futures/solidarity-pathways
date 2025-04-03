@@ -9,8 +9,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { PathwaysSettingsMenu } from "~/components/settings/pathways-settings-menu";
 import { ImportDriversButton } from "~/app/[depotId]/overview/_components/import-drivers-button";
-import { PathwaySettingsButton } from "~/app/[depotId]/overview/_components/pathways-settings-button";
 
 export const AddNewDataPopover = () => {
   const { onSheetOpenChange } = useDriver();
@@ -41,7 +41,10 @@ export const AddNewDataPopover = () => {
             </Button>
             <ImportDriversButton />
 
-            <PathwaySettingsButton />
+            <PathwaysSettingsMenu
+              buttonClassName="mx-0 flex gap-2 px-0"
+              buttonVariant="link"
+            />
           </div>
         </div>
       </PopoverContent>

@@ -31,7 +31,7 @@ export const MobileDrawer = () => {
   } = useMapStore();
 
   const { defaultActions } = useDefaultMutationActions({
-    invalidateEntities: ["routePlan", "job", "vehicle"],
+    invalidateEntities: ["routePlan", "job", "vehicle", "driver", "customer"],
   });
 
   const toggleFlyToTimer = () => {

@@ -13,7 +13,8 @@ export const DriverVehicleSheetBtn = ({ text = "Manage Drivers" }: Props) => {
   return (
     <Button
       variant="outline"
-      className="px-3 shadow-none"
+      size="sm"
+      className="my-1 px-3 shadow-none"
       onClick={openDriverVehicleSheet}
     >
       <Users className="mr-2 h-4 w-4" />

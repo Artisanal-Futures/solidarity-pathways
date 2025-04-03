@@ -49,7 +49,7 @@ export const formatDriverFormDataToBundle = (
         data?.startAddress?.longitude ??
         data.address.longitude,
     },
-    type: data.type,
+
     maxTravelTime: minutesToSeconds(data?.maxTravelTime ?? 0),
     maxTasks: Number(data?.maxTasks) ?? 0,
     maxDistance: milesToMeters(data?.maxDistance ?? 0),

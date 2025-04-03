@@ -75,11 +75,13 @@
 //     </>
 //   );
 // }
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signIn } from "~/server/auth";
 import { AuthError } from "next-auth";
 
-import { Button } from "~/components/ui/button";
+import { cn } from "~/lib/utils";
+import { Button, buttonVariants } from "~/components/ui/button";
 import {
   Card,
   CardContent,
@@ -110,7 +112,7 @@ export default async function SignInPage(props: {
   const searchParams = await props.searchParams;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50">
+    <div className="flex min-h-full items-center justify-center">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader>
           <CardTitle className="text-center text-2xl">Welcome Back</CardTitle>
@@ -201,9 +203,12 @@ export default async function SignInPage(props: {
               </div>
             </div>
 
-            <Button variant="link" className="w-full">
+            <Link
+              href="/sign-up"
+              className={cn(buttonVariants({ variant: "link" }), "w-full")}
+            >
               Create an account
-            </Button>
+            </Link>
           </div>
         </CardContent>
       </Card>

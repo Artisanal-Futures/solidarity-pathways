@@ -34,8 +34,8 @@ export const jobSchema = z.object({
   priority: z.number(),
   timeWindowStart: z.number(),
   timeWindowEnd: z.number(),
-  notes: z.string().optional(),
-  order: z.string().optional(),
+  notes: z.string().optional().nullish(),
+  order: z.string().optional().nullish(),
   isOptimized: z.boolean().optional(),
 });
 
@@ -51,6 +51,11 @@ export const jobSchema = z.object({
 // });
 
 export const clientJobSchema = z.object({
+  client: clientSchema.optional(),
+  job: jobSchema,
+});
+
+export const clientJobOptimizationSchema = z.object({
   client: clientSchema.optional(),
   job: jobSchema,
 });

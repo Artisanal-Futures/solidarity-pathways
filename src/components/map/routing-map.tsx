@@ -1,3 +1,5 @@
+"use client";
+
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
@@ -68,7 +70,7 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
   const { routeId, depotId } = useSolidarityState();
 
   const { defaultActions } = useDefaultMutationActions({
-    invalidateEntities: ["driver", "vehicle", "routePlan"],
+    invalidateEntities: ["driver", "vehicle", "routePlan", "job", "customer"],
   });
 
   const mapRef = useRef<LeafletMap>(null);

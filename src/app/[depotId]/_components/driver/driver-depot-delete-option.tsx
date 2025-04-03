@@ -1,12 +1,11 @@
 "use client";
 
-import type { DriverVehicleBundle } from "~/lib/validators/driver-vehicle";
 import { api } from "~/trpc/react";
 import { useDefaultMutationActions } from "~/hooks/use-default-mutation-actions";
 
-type Props = { row: DriverVehicleBundle };
+type Props = { id: string };
 
-export const DriverDepotDeleteOption = ({ row }: Props) => {
+export const DriverDepotDeleteOption = ({ id }: Props) => {
   const { defaultActions } = useDefaultMutationActions({
     invalidateEntities: ["driver", "routePlan"],
   });
@@ -15,7 +14,7 @@ export const DriverDepotDeleteOption = ({ row }: Props) => {
     api.driver.deleteWithVehicles.useMutation(defaultActions);
 
   const deleteDriver = () => {
-    deleteDriverMutation.mutate(row.driver.id);
+    deleteDriverMutation.mutate(id);
   };
 
   return (

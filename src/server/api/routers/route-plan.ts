@@ -172,7 +172,7 @@ export const routePlanRouter = createTRPCRouter({
         data: { status: input.state },
       });
 
-      await pusherServer.trigger("map", `evt::invalidate-stops`, null);
+      await pusherServer.trigger("map", `evt::invalidate-stops`, "");
       await pusherServer.trigger(
         "map",
         `evt::update-route-status`,
@@ -452,8 +452,8 @@ export const routePlanRouter = createTRPCRouter({
               maxDistance:
                 defaultVehicle?.maxDistance ??
                 driverVehicle.vehicle.maxDistance,
-              notes: defaultVehicle?.notes ?? driverVehicle.vehicle.notes ?? "",
-              cargo: defaultVehicle?.cargo ?? driverVehicle.vehicle.cargo ?? "",
+              notes: `${defaultVehicle?.notes ?? driverVehicle.vehicle.notes}`,
+              cargo: `${defaultVehicle?.cargo ?? driverVehicle.vehicle.cargo}`,
               breaks: {
                 create: (defaultVehicle
                   ? defaultVehicle.breaks
@@ -467,7 +467,7 @@ export const routePlanRouter = createTRPCRouter({
             },
           });
 
-          if (!defaultVehicle?.endAddress) return vehicle;
+          if (!defaultVehicle?.endAddress || !endAddress.id) return vehicle;
 
           return ctx.db.vehicle.update({
             where: { id: vehicle.id },

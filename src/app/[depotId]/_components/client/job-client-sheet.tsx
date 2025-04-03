@@ -14,8 +14,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "~/components/map-sheet";
-import { DataTable } from "~/components/shared/data-sheet/data-table";
 import { LoadButton } from "~/components/shared/load-button";
+import { AdvancedDataTable } from "~/app/_components/tables/advanced-data-table";
 import { StopForm } from "~/app/[depotId]/_components/client/stop-form";
 
 import { jobDepotColumns } from "./job-depot-columns";
@@ -46,7 +46,6 @@ export const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
     onSheetOpenChange,
     jobSheetMode,
     setJobSheetMode,
-    routeJobs,
   } = useClient();
 
   const title = activeJobData
@@ -61,6 +60,17 @@ export const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
     });
   };
 
+  const formattedDepotClients =
+    getStopsByDate?.data?.map((row) => ({
+      id: row.job?.id ?? "",
+      name: row.client?.name ?? "",
+      type: row.job?.type,
+      address: row.job?.address?.formatted,
+      bundle: {
+        client: row?.client,
+        job: row?.job,
+      },
+    })) ?? [];
   return (
     <Sheet open={isJobSheetOpen} onOpenChange={onSheetOpenChange}>
       <SheetContent
@@ -132,15 +142,24 @@ export const JobClientSheet = ({ standalone }: { standalone?: boolean }) => {
                 </div>
 
                 {date && (
-                  <DataTable
-                    storeData={routeJobs}
-                    data={getStopsByDate.data ?? []}
-                    setSelectedData={setSelectedData}
-                    idAccessor={(row) => row.job.id}
-                    accessorKey="job_address"
-                    type="job"
-                    searchPlaceholder="Search jobs..."
+                  <AdvancedDataTable
+                    searchKey="name"
+                    searchPlaceholder="Search clients by name..."
                     columns={jobDepotColumns}
+                    data={formattedDepotClients}
+                    preSelectAccessor="id"
+                    preSelectedDataIds={[]}
+                    setSelectedData={(data) => {
+                      // Convert the data format to match what setSelectedData expects
+                      const formattedData = data.map((item) => ({
+                        job: item.job ?? {},
+                        client: item.client ?? {},
+                      }));
+                      setSelectedData(formattedData as ClientJobBundle[]);
+
+                      console.log(formattedData);
+                    }}
+                    postSelectAccessor="bundle"
                   />
                 )}
               </TabsContent>

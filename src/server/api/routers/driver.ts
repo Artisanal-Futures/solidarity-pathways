@@ -205,7 +205,6 @@ const createDriver = async ({
     data: {
       depotId,
       ...driverRest,
-
       address: { create: { ...driverAddress } },
     },
     include: { address: true },
@@ -259,6 +258,7 @@ const createDriver = async ({
       data: {
         driverId: driver.id,
         ...defaultVehicleData,
+        routeId,
       },
     });
 
@@ -273,13 +273,6 @@ const createDriver = async ({
         },
       });
     }
-
-    await db.route.update({
-      where: { id: routeId },
-      data: {
-        vehicles: { connect: { id: routeVehicle.id } },
-      },
-    });
   }
 
   return { driver, vehicle } as DriverVehicleBundle;

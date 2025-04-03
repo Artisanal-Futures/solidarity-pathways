@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { uniqueId } from "lodash";
 import { Pencil } from "lucide-react";
@@ -39,7 +41,7 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
   );
 
   const { defaultActions } = useDefaultMutationActions({
-    invalidateEntities: ["job", "routePlan"],
+    invalidateEntities: ["job", "routePlan", "customer"],
   });
   const { routeId, depotId } = useSolidarityState();
 
@@ -50,9 +52,9 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
 
   const defaultValues: Partial<StopFormValues> = {
     id: activeLocation?.job.id ?? uniqueId("job_"),
-    clientId: activeLocation?.client?.id ?? undefined,
+    clientId: activeLocation?.client?.id ?? "",
     addressId: activeLocation?.job.addressId ?? uniqueId("address_"),
-    clientAddressId: activeLocation?.client?.addressId ?? undefined,
+    clientAddressId: activeLocation?.client?.addressId ?? "",
 
     type: activeLocation?.job.type ?? "DELIVERY",
 
@@ -84,7 +86,7 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
     prepTime: secondsToMinutes(activeLocation?.job.prepTime) ?? 5,
 
     priority: activeLocation?.job.priority ?? 1,
-    email: activeLocation?.client?.email ?? undefined,
+    email: activeLocation?.client?.email ?? "",
     order: activeLocation?.job.order ?? "",
     notes: activeLocation?.job.notes ?? "",
   };
@@ -96,6 +98,7 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
 
   const onSubmit = async (data: StopFormValues) => {
     const jobBundle = formatJobFormDataToBundle(data);
+    console.log("jobBundle", jobBundle);
 
     if (!activeLocation) {
       await createJob.mutateAsync({
@@ -111,6 +114,14 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
     }
 
     await updateJob.mutateAsync({ job: jobBundle.job, routeId });
+
+    if (jobBundle.client) {
+      await updateClient.mutateAsync({
+        depotId,
+        client: jobBundle.client,
+        jobId: activeLocation?.job.id,
+      });
+    }
 
     if (editClient && data?.clientId && !data?.clientId.includes("client_")) {
       if (!jobBundle.client) throw new Error("No client was found");
@@ -130,6 +141,7 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
       <Form {...form}>
         <form
           onSubmit={(e) => void form.handleSubmit(onSubmit)(e)}
+          onChange={(e) => console.log(form.formState.errors)}
           className="flex h-full max-h-[calc(100vh-50vh)] w-full flex-col space-y-8 md:h-[calc(100vh-15vh)] lg:flex-grow"
         >
           {!!activeLocation && (
@@ -175,7 +187,15 @@ export const StopForm = ({ handleOnOpenChange, activeLocation }: Props) => {
             >
               <StopDetailsSection form={form} />
 
-              <ClientDetailsSection form={form} editClient={editClient} />
+              <ClientDetailsSection
+                form={form}
+                editClient={editClient}
+                onClientModeChange={(mode) => {
+                  if (mode === "create") {
+                    setAccordionValue("item-2");
+                  }
+                }}
+              />
             </Accordion>
           </div>
         </form>

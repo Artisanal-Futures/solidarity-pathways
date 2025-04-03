@@ -5,12 +5,18 @@ import { clientSchema } from "~/lib/validators/client-job";
 
 export const clientRouterAlt = createTRPCRouter({
   update: protectedProcedure
-    .input(z.object({ depotId: z.string(), client: clientSchema }))
+    .input(
+      z.object({
+        depotId: z.string(),
+        client: clientSchema,
+        jobId: z.string().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const { address, ...clientData } = input.client;
-      const client = await ctx.db.client.update({
+      const client = await ctx.db.client.upsert({
         where: { email: input.client.email },
-        data: {
+        update: {
           ...(address
             ? {
                 address: {
@@ -26,9 +32,28 @@ export const clientRouterAlt = createTRPCRouter({
           email: clientData.email,
           depotId: input.depotId,
         },
+        create: {
+          ...(address
+            ? {
+                address: {
+                  create: { ...address },
+                },
+              }
+            : {}),
+          name: clientData.name,
+          phone: clientData.phone,
+          email: clientData.email,
+          depotId: input.depotId,
+        },
         include: { address: true },
       });
 
+      if (input.jobId) {
+        await ctx.db.job.update({
+          where: { id: input.jobId },
+          data: { clientId: client.id },
+        });
+      }
       return {
         data: client,
         message: "Client was successfully updated.",
