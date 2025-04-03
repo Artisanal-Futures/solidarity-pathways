@@ -17,11 +17,11 @@ export default async function PathPage({
   const { depotId, pathId } = await params;
   const session = await auth();
 
-  if (!session) return redirect("/sandbox");
+  if (!session) return redirect("/welcome");
 
   if (session?.user?.role === "DRIVER") return redirect("/unauthorized");
 
-  if (!session?.user) return redirect("/sandbox");
+  if (!session?.user) return redirect("/welcome");
 
   const depot = await db.depot.findUnique({
     where: { id: depotId },

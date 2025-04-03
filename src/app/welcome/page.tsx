@@ -7,7 +7,9 @@ import RouteLayout from "~/components/layout/route-layout";
 export default async function SandboxRoutingPage() {
   const session = await auth();
 
-  const redirectLink = session?.user ? "/" : "/auth/signin";
+  const redirectLink = session?.user
+    ? `/${session.user.id}/overview`
+    : `/sign-in?callbackUrl=${encodeURIComponent("/")}`;
 
   return (
     <>
@@ -15,12 +17,11 @@ export default async function SandboxRoutingPage() {
         <div className="flex flex-1 flex-col items-center justify-center">
           <h1 className="scroll-m-20 text-center text-4xl font-extrabold tracking-tight lg:text-5xl">
             {" "}
-            Solidarity Pathways Sandbox
+            Welcome to Solidarity Pathways
           </h1>
           <p className="text-center leading-7 [&:not(:first-child)]:mt-6">
-            <span className="font-bold">Coming Soon: </span>A way to generate
-            optimal routes for your delivery needs. Check back later for more
-            details.
+            A simpler way to generate optimal routes for your delivery needs.
+            Check back later for more details.
           </p>
 
           <Link href={redirectLink}>

@@ -12,7 +12,7 @@ export default async function DepotHomePage({
   const { depotId } = await params;
 
   if (!session?.user) {
-    redirect("/sandbox");
+    redirect("/welcome");
   }
 
   const userId = session.user.id;

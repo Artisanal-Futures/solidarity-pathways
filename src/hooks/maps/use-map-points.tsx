@@ -134,7 +134,7 @@ export const useMapGraphics = ({
     } else if (jobStatus === "FAILED") {
       color = -10; //"#FF0000";
     }
-    console.log("status is", jobStatus, stop.id, color);
+    // console.log("status is", jobStatus, stop.id, color);
 
     //return color;
     return color; //stop.color

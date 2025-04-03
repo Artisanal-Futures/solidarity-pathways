@@ -12,12 +12,12 @@ export default async function PathwaysDepotOverviewPage({
   const session = await auth();
 
   const { depotId } = await params;
-  if (!session) return redirect("/sandbox");
+  if (!session) return redirect("/welcome");
 
   if (session?.user?.role === "DRIVER") return redirect("/unauthorized");
 
   //TODO: Redirect to sign in
-  if (!session?.user) return redirect("/sandbox");
+  if (!session?.user) return redirect("/welcome");
 
   const depot = await db.depot.findUnique({
     where: { id: depotId },

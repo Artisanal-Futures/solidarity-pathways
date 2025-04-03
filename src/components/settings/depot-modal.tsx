@@ -99,7 +99,7 @@ export const DepotModal = ({ initialData }: Props) => {
           <div className="flex w-full items-center justify-end space-x-2 pt-6">
             {!initialData && (
               <Link
-                href="/sandbox"
+                href="/welcome"
                 className={buttonVariants({ variant: "outline" })}
               >
                 Nah, I&apos;m good

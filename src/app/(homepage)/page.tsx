@@ -8,7 +8,7 @@ export default async function SolidarityPathwaysHomePage() {
   const session = await auth();
   const userId = session?.user.id;
 
-  if (!session || !session.user) redirect("/sandbox");
+  if (!session || !session.user) redirect("/welcome");
 
   const depot = await db.depot.findFirst({
     where: { ownerId: userId },
