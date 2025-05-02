@@ -158,6 +158,7 @@ export const vroomStepSchema = z.object({
     "break",
     "start",
     "end",
+    "vending", //
   ]),
   violations: z.array(z.unknown()),
   waiting_time: z.number(),
@@ -189,6 +190,7 @@ export const vroomUnassignedSchema = z.object({
   location: z.tuple([z.number(), z.number()]),
   description: z.string(),
   type: z.string(),
+  //type: z.enum(["job", "vending"]),
 });
 
 export const vroomOptimizationSchema = z.object({

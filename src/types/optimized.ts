@@ -79,7 +79,8 @@ export type OptimizedResponseData = {
         | "shipment"
         | "break"
         | "start"
-        | "end";
+        | "end"
+        | "vending";//should vending be a specific type?
     }[];
   }[];
 };

@@ -33,6 +33,7 @@ import { useMassMessage } from "~/hooks/use-mass-message";
 import { useUrlParams } from "~/hooks/use-url-params";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent } from "~/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import RouteLayout from "~/components/layout/route-layout";
 import { ViewPathsMobileDrawer } from "~/components/mobile/view-paths-mobile-drawer";
 import { AbsolutePageLoader } from "~/components/other/absolute-page-loader";
@@ -66,6 +67,10 @@ export const RouteClient = () => {
 
   const createJobBundles = api.job.createMany.useMutation({
     ...defaultActions,
+  });
+  const [showVendingModal, setShowVendingModal] = useState(false);
+  const vendingMachinesQuery = api.vendingMachine.getAll.useQuery(undefined, {
+    enabled: showVendingModal, // fetch only when modal is open
   });
 
   const buildJobsMutation = api.demo.import.useMutation({
@@ -246,7 +251,6 @@ export const RouteClient = () => {
         message: "Test message from client",
         timestamp: new Date().toISOString(),
       });
-
       if (success) {
         toastService.inform("Client event triggered successfully");
       } else {
@@ -302,6 +306,16 @@ export const RouteClient = () => {
             </Button>
           </div>
 
+          <div className="p-1">
+            <Button
+              onClick={() => setShowVendingModal(true)}
+              className="hover:bg-dark-gray bg-black text-white"
+            >
+              <PlusCircle />
+              Vending
+            </Button>
+          </div>
+          
           <div className="p-1">
             <Button
               onClick={() => calculateOptimalPaths()}
@@ -466,6 +480,32 @@ export const RouteClient = () => {
             Please refresh the page and try again.
           </p>
         )}
+        <Dialog open={showVendingModal} onOpenChange={setShowVendingModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Vending Machines</DialogTitle>
+            </DialogHeader>
+
+            {vendingMachinesQuery.isLoading && <p>Loading vending machines...</p>}
+            {vendingMachinesQuery.error && (
+              <p className="text-red-500">Failed to load vending machines.</p>
+            )}
+            {vendingMachinesQuery.data && (
+              <div className="space-y-2">
+                <p>Total machines: {vendingMachinesQuery.data.length}</p>
+                <ul className="max-h-60 overflow-y-auto space-y-1">
+                  {vendingMachinesQuery.data.map((v) => (
+                    <li key={v.id} className="text-sm">
+                      <strong>{v.name ?? "Unnamed"}</strong> – lat:{" "}
+                      {v.coordinates.latitude.toFixed(4)}, lng:{" "}
+                      {v.coordinates.longitude.toFixed(4)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </RouteLayout>
     </>
   );

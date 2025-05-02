@@ -69,6 +69,8 @@ export const routePlanRouter = createTRPCRouter({
           prep: step.setup,
           type: step.type,
           jobId: step?.description ?? null,
+         
+         
           status: RouteStatus.PENDING,
         })),
       }));
