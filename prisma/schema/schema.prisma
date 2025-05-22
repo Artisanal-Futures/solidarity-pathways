@@ -161,3 +161,16 @@ model GuestSurvey {
 
   @@index([userId])
 }
+
+model VendingMachine {
+  id                String    @id @default(cuid())
+  name              String?
+  latitude          Float
+  longitude         Float
+  address           String?
+  inventory         Json      @default("{}")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([latitude, longitude])
+}

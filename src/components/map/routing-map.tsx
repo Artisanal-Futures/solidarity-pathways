@@ -1,12 +1,19 @@
+//routing-map.tsx
 "use client";
 
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import type L from "leaflet";
 import type { LatLngExpression, Map as LeafletMap, PathOptions } from "leaflet";
 import type { MouseEventHandler } from "react";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "~/components/ui/sheet";
 import {
   forwardRef,
   useEffect,
@@ -54,6 +61,10 @@ import { MapPopup } from "~/components/map/map-popup";
 import { RouteMarker } from "~/components/map/route-marker";
 
 import { MapViewButton } from "./map-view-button";
+import { VendingMachine } from "~/types/vendingMachine";
+
+
+
 
 type Props = {
   className?: string;
@@ -72,16 +83,38 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
   const { defaultActions } = useDefaultMutationActions({
     invalidateEntities: ["driver", "vehicle", "routePlan", "job", "customer"],
   });
-
+  //xinyi
+  const apiContext = api.useUtils();
+  //xinyi
   const mapRef = useRef<LeafletMap>(null);
+  
 
   const [latLng, setLatLng] = useState<L.LatLng | null>(null);
   const [activeDrivers, setActiveDrivers] = useState<CoordMap>({});
-
+  //xinyi
+  const [selectedVendingMachine, setSelectedVendingMachine] = useState<VendingMachine | null>(null);
+  const [newName, setNewName] = useState<string>("");
   const { setSelectedJobIds, selectedJobIds } = useClient();
   const { currentDepot } = useDepot();
   const { activeDriverData } = useDriver();
   const { activeJobData } = useClient();
+
+  //to be edited
+  const [inventoryJson, setInventoryJson] = useState("");
+    useEffect(() => {
+      if (selectedVendingMachine) {
+        setInventoryJson(JSON.stringify(selectedVendingMachine.inventory ?? {}, null, 2));
+      }
+    }, [selectedVendingMachine]);
+
+  const [editedInventory, setEditedInventory] = useState<Record<string, number>>({});
+    useEffect(() => {
+      if (selectedVendingMachine) {
+        setEditedInventory(selectedVendingMachine.inventory ?? {});
+      }
+    }, [selectedVendingMachine]);
+  //to be edited
+  
 
   const params = {
     mapRef: mapRef.current!,
@@ -97,7 +130,20 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
   const createVehicleBundle =
     api.driver.createByLatLng.useMutation(defaultActions);
   const createJobBundle = api.job.createByLatLng.useMutation(defaultActions);
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-unsafe-call
+  const createVendingMachine = api.vendingMachine.create.useMutation({
+    onSuccess: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      await apiContext.vendingMachine.getAll.invalidate();
+    },
+    onError: (error) => {
+      console.error(error);
+    },
+  });
+  const getVendingMachines = api.vendingMachine.getAll.useQuery(undefined, {
+    enabled: true,
+  });
+  
   const addDriverByLatLng = async ({ latitude, longitude }: Coordinates) => {
     await createVehicleBundle.mutateAsync({
       latitude,
@@ -115,7 +161,16 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
       routeId,
     });
   };
-
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const addVendingMachineByLatLng = async ({ latitude, longitude }: Coordinates) => {
+    await createVendingMachine.mutateAsync({
+      name: "New Vending Machine",
+      coordinates: { latitude, longitude },
+      address: undefined,
+      inventory: {},
+    });
+  };
+  
   useImperativeHandle(ref, () => ({
     reactLeafletMap: mapRef.current,
   }));
@@ -168,6 +223,17 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
       pusherClient.unsubscribe("map");
     };
   }, []);
+
+  //tobe edited
+  const updateVendingMachine = api.vendingMachine.update.useMutation({
+      onSuccess: async () => {
+        await apiContext.vendingMachine.getAll.invalidate();
+      },
+      onError: (error) => {
+        console.error(error);
+      },
+  });
+  //tobe edited
 
   return (
     <>
@@ -238,6 +304,32 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
                 />
               </RouteMarker>
             )}
+
+            
+            {getVendingMachines.data?.map((vending) => (
+              <RouteMarker
+                key={vending.id}
+                id={vending.id}
+                variant="depot"
+                position={[
+                  vending.coordinates.latitude,
+                  vending.coordinates.longitude,
+                ]}
+                color={5}
+                onClick={() => {
+                  setSelectedVendingMachine(vending);
+                  setNewName(vending.name ?? "");
+                  setEditedInventory(vending.inventory);
+                }}
+              >
+                <div className="flex flex-col">
+                  <span className="font-semibold">{vending.name ?? "Unnamed Vending"}</span>
+                  {vending.address && (
+                    <span className="text-xs">{vending.address}</span>
+                  )}
+                </div>
+              </RouteMarker>
+            ))}
 
             {activeDrivers &&
               Object.keys(activeDrivers).map(async (vehicleId) => {
@@ -398,11 +490,138 @@ const RoutingMap = forwardRef<MapRef, Props>(({ className }, ref) => {
                 </div>
               </div>
             </ContextMenuItem>
+
+            <ContextMenuItem
+              onClick={() =>
+                addVendingMachineByLatLng({
+                  latitude: latLng.lat,
+                  longitude: latLng.lng,
+                })
+              }
+            >
+              <div className="flex flex-col items-center justify-center">
+                <div>Add Vending Machine here</div>
+                <div className="text-sm text-gray-500">
+                  ({latLng?.lat.toFixed(2) ?? 0}, {latLng?.lng.toFixed(2) ?? 0})
+                </div>
+              </div>
+            </ContextMenuItem>
           </ContextMenuContent>
         )}
       </ContextMenu>
+
+      
+      {selectedVendingMachine && (
+        <Sheet
+          open={!!selectedVendingMachine}
+          onOpenChange={(open) => {
+            if (!open) setSelectedVendingMachine(null);
+          }}
+        >
+          <SheetContent side="right" className="bg-white">
+            <SheetHeader>
+              <SheetTitle>Edit Vending Machine</SheetTitle>
+              <SheetDescription>
+                <input
+                  className="border border-gray-300 rounded-md p-2 mt-2 w-full"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Enter vending machine name"
+                />
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="py-4 space-y-4">
+              {Object.entries(editedInventory).map(([name, quantity], index) => (
+                <div key={index} className="flex items-center space-x-2">
+                  <input
+                    className="border rounded p-2 flex-1"
+                    value={name}
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      setEditedInventory((prev) => {
+                        const updated = { ...prev };
+                        const value = updated[name]?? 0;
+                        delete updated[name];
+                        updated[newName] = value;
+                        return updated;
+                      });
+                    }}
+                    placeholder="Product Name"
+                  />
+                  <input
+                    type="number"
+                    className="border rounded p-2 w-24"
+                    value={quantity}
+                    onChange={(e) => {
+                      const newQty = parseInt(e.target.value) || 0;
+                      setEditedInventory((prev) => ({ ...prev, [name]: newQty }));
+                    }}
+                    placeholder="Quantity"
+                  />
+                  <button
+                    className="text-red-500 hover:text-red-700"
+                    onClick={() => {
+                      setEditedInventory((prev) => {
+                        const updated = { ...prev };
+                        delete updated[name];
+                        return updated;
+                      });
+                    }}
+                  >
+                    x
+                  </button>
+                </div>
+              ))}
+
+              <button
+                className="text-blue-600 hover:underline"
+                onClick={() => {
+                  let newKey = "New Product";
+                  let count = 1;
+                  while (editedInventory[newKey]) {
+                    newKey = `New Product ${count++}`;
+                  }
+                  setEditedInventory((prev) => ({ ...prev, [newKey]: 0 }));
+                }}
+              >
+                + Add Product
+              </button>
+            </div>
+
+            <SheetFooter>
+              <button
+                className="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                onClick={async () => {
+                  if (!selectedVendingMachine) return;
+
+                  const cleanedInventory = Object.fromEntries(
+                    Object.entries(editedInventory).filter(
+                      ([name, qty]) => name.trim() !== "" && qty >= 0
+                    )
+                  );
+
+                  await updateVendingMachine.mutateAsync({
+                    id: selectedVendingMachine.id,
+                    data: {
+                      name: newName.trim() || "Unnamed Vending Machine",
+                      inventory: cleanedInventory,
+                    },
+                  });
+
+                  await apiContext.vendingMachine.getAll.invalidate();
+                  setSelectedVendingMachine(null);
+                }}
+              >
+                Save Changes
+              </button>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+      )}
     </>
   );
 });
+
 RoutingMap.displayName = "RoutingMap";
 export default RoutingMap;

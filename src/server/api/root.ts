@@ -9,6 +9,10 @@ import { jobRouter } from "./routers/job";
 import { routeOptimizationRouter } from "./routers/route-optimization";
 import { routePlanRouter } from "./routers/route-plan";
 import { vehicleRouter } from "./routers/vehicle";
+<<<<<<< HEAD
+=======
+import { vendingMachineRouter } from "./routers/vending-machine";
+>>>>>>> add-vending-type-xinyi
 
 /**
  * This is the primary router for your server.
@@ -28,6 +32,10 @@ export const appRouter = createTRPCRouter({
   geocode: geocodeRouter,
 
   routeOptimization: routeOptimizationRouter,
+<<<<<<< HEAD
+=======
+  vendingMachine: vendingMachineRouter,
+>>>>>>> add-vending-type-xinyi
 });
 
 // export type definition of API
