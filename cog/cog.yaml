@@ -2,7 +2,7 @@ build:
   gpu: true
   python_version: "3.8"
   python_packages:
-    - "paddlepaddle-gpu==2.5.2"
+    - "paddlepaddle-gpu==2.6.0"
     - "opencv-python==4.8.1.78"
     - "numpy==1.24.3"
     - "requests==2.31.0"
@@ -13,7 +13,7 @@ build:
     - "libgl1-mesa-glx"
     - "libglib2.0-0"
   run:
-    - "git clone https://github.com/PaddlePaddle/PaddleDetection.git /opt/paddle/PaddleDetection"
+    - "git clone --branch v2.8.1 https://github.com/PaddlePaddle/PaddleDetection.git /opt/paddle/PaddleDetection"
     - "cd /opt/paddle/PaddleDetection && pip install -r requirements.txt"
     - "cd /opt/paddle/PaddleDetection && python setup.py install"
     - "mkdir -p /opt/paddle/PaddleDetection/output_inference"
