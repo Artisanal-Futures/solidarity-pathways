@@ -1,5 +1,22 @@
 build:
   gpu: true
-  dockerfile: "Dockerfile"
+  python_version: "3.8"
+  python_packages:
+    - "paddlepaddle-gpu==2.3.2"
+    - "opencv-python==4.8.1.78"
+    - "numpy==1.24.3"
+    - "requests==2.31.0"
+    - "pyyaml==6.0.1"
+    - "pillow==10.0.1"
+  system_packages:
+    - "ffmpeg"
+    - "libgl1-mesa-glx"
+    - "libglib2.0-0"
+  run:
+    - "git clone https://github.com/PaddlePaddle/PaddleDetection.git /opt/paddle/PaddleDetection"
+    - "cd /opt/paddle/PaddleDetection && pip install -r requirements.txt"
+    - "cd /opt/paddle/PaddleDetection && python setup.py install"
+    - "mkdir -p /opt/paddle/PaddleDetection/output_inference"
+    - "cd /opt/paddle/PaddleDetection && python tools/export_model.py -c configs/mot/centertrack/centertrack_hrnet_w18_256x192.yml -o weights=https://paddledet.bj.bcebos.com/models/mot/centertrack_hrnet_w18_256x192.pdparams"
 
 predict: "predict.py:predict"
