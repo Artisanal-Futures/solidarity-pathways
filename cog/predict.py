@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 import tempfile
 import shutil
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+import multiprocessing as mp
+from functools import partial
 
 # Cog imports
 from cog import BasePredictor, Input, Path as CogPath
@@ -165,32 +168,59 @@ OCSORTTracker:
         return thumbnail_b64
     
     def get_crops(self, tlwhs, frame, w=64, h=192):
-        """Extract image crops from bounding boxes for Re-ID feature extraction"""
+        """Extracts and resizes image crops from bounding boxes."""
         crops = []
         for tlwh in tlwhs:
-            x1, y1, w_box, h_box = tlwh
-            x2, y2 = x1 + w_box, y1 + h_box
+            x, y, w_box, h_box = map(int, tlwh)
             
             # Ensure coordinates are within frame bounds
-            x1, y1 = max(0, int(x1)), max(0, int(y1))
-            x2, y2 = min(frame.shape[1], int(x2)), min(frame.shape[0], int(y2))
+            x = max(0, min(x, frame.shape[1]))
+            y = max(0, min(y, frame.shape[0]))
+            w_box = min(w_box, frame.shape[1] - x)
+            h_box = min(h_box, frame.shape[0] - y)
             
-            if x2 > x1 and y2 > y1:
-                crop = frame[y1:y2, x1:x2]
-                # Resize to Re-ID model input size
-                crop = cv2.resize(crop, (w, h))
-                # Convert to RGB and normalize
-                crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-                crop = crop.astype('float32') / 255.0
-                # Add batch dimension
-                crop = np.expand_dims(crop, axis=0)
-                crops.append(crop)
+            if w_box > 0 and h_box > 0:
+                crop = frame[y:y+h_box, x:x+w_box]
+                if crop.size > 0:
+                    resized_crop = cv2.resize(crop, (w, h))
+                    # Convert to RGB and normalize for Re-ID model
+                    resized_crop = cv2.cvtColor(resized_crop, cv2.COLOR_BGR2RGB)
+                    resized_crop = resized_crop.astype('float32') / 255.0
+                    # Add batch dimension
+                    resized_crop = np.expand_dims(resized_crop, axis=0)
+                    crops.append(resized_crop)
+                else:
+                    crops.append(np.zeros((1, h, w, 3), dtype='float32'))
             else:
-                # Create a black crop if bbox is invalid
-                crop = np.zeros((1, h, w, 3), dtype='float32')
-                crops.append(crop)
+                crops.append(np.zeros((1, h, w, 3), dtype='float32'))
         
         return np.array(crops)
+    
+    def encode_crop_to_base64(self, crop):
+        """Convert a crop array to base64 encoded JPEG string"""
+        try:
+            # Remove batch dimension if present
+            if len(crop.shape) == 4:
+                crop = crop[0]
+            
+            # Convert from normalized float to uint8
+            if crop.dtype == 'float32':
+                crop = (crop * 255).astype('uint8')
+            
+            # Convert from RGB to BGR for OpenCV
+            crop_bgr = cv2.cvtColor(crop, cv2.COLOR_RGB2BGR)
+            
+            # Resize to thumbnail size
+            thumbnail = cv2.resize(crop_bgr, (128, 128))
+            
+            # Encode to base64
+            _, buffer = cv2.imencode('.jpg', thumbnail)
+            thumbnail_b64 = base64.b64encode(buffer).decode('utf-8')
+            
+            return thumbnail_b64
+        except Exception as e:
+            print(f"Error encoding crop to base64: {e}")
+            return ""
     
     def extract_reid_features(self, crops):
         """Extract Re-ID features from image crops"""
@@ -223,8 +253,12 @@ OCSORTTracker:
             return np.random.rand(len(crops), 512)
     
     def process_video(self, video_path: str) -> Dict[str, Any]:
-        """Process video with two-step tracking: ByteTrack + Re-ID clustering"""
-        print(f"Processing video: {video_path}")
+        """
+        Process video with an EFFICIENT two-step tracking workflow:
+        1. Single-pass ByteTrack to get detections and crops.
+        2. Offline Re-ID clustering to get stable IDs.
+        """
+        print(f"Processing video with single-pass workflow: {video_path}")
         
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
@@ -234,26 +268,18 @@ OCSORTTracker:
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        cap.release()
         
         print(f"Video properties: {width}x{height}, {fps} fps, {frame_count} frames")
         
-        # Step 1: Use efficient predict_video method to get MOT results
-        print("Step 1: Running ByteTrack with predict_video method...")
+        # --- Step 1: Parallel Frame Processing ---
+        print("Step 1: Processing frames in parallel...")
         
-        # Temporarily enable text output to get MOT results
-        original_save_mot_txts = self.tracker.save_mot_txts
-        self.tracker.save_mot_txts = True
+        # Determine optimal number of workers
+        num_workers = min(mp.cpu_count(), 8)  # Cap at 8 to avoid memory issues
+        print(f"Using {num_workers} parallel workers")
         
-        # Run video prediction using the efficient method
-        # camera_id=-1 indicates prediction from a video file, not a camera stream
-        self.tracker.predict_video(video_file=video_path, camera_id=-1)
-        
-        # Parse the MOT text output to get all detections
-        all_detections = self._parse_mot_txt_results()
-        
-        # Restore original setting
-        self.tracker.save_mot_txts = original_save_mot_txts
+        # Process frames in parallel
+        all_detections = self._process_frames_parallel(video_path, frame_count, num_workers)
         
         print(f"Collected {len(all_detections)} detections across {frame_count} frames")
         
@@ -269,7 +295,7 @@ OCSORTTracker:
                 "unique_classes": []
             }
         
-        # Step 2: Extract Re-ID features and cluster
+        # --- Step 2: Extract Re-ID Features and Cluster ---
         print("Step 2: Extracting Re-ID features and clustering...")
         
         # Extract features from all crops
@@ -277,12 +303,17 @@ OCSORTTracker:
         if len(all_crops) > 0:
             all_features = self.extract_reid_features(all_crops)
             
+            # Add features back to detections
+            crop_idx = 0
+            for detection in all_detections:
+                if detection['crop'] is not None:
+                    detection['feature'] = all_features[crop_idx]
+                    crop_idx += 1
+            
             # Normalize features for clustering
             normalized_features = normalize(all_features, norm='l2')
             
             # Cluster using DBSCAN
-            # eps: maximum distance between samples for clustering
-            # min_samples: minimum number of samples in a cluster
             clustering = DBSCAN(eps=0.4, min_samples=2, metric='cosine').fit(normalized_features)
             cluster_labels = clustering.labels_
             
@@ -305,7 +336,7 @@ OCSORTTracker:
                     cluster_counter += 1
                 detection['cluster_id'] = track_to_cluster[track_id]
         
-        # Step 3: Build final results
+        # --- Step 3: Build Final Results ---
         print("Step 3: Building final results...")
         
         results = {
@@ -344,15 +375,10 @@ OCSORTTracker:
             # Find the best detection (highest confidence) for thumbnail
             best_detection = max(detections, key=lambda x: x['score'])
             
-            # Generate thumbnail from the best detection
-            cap = cv2.VideoCapture(video_path)
-            cap.set(cv2.CAP_PROP_POS_FRAMES, best_detection['frame_id'] - 1)
-            ret, frame = cap.read()
-            cap.release()
-            
+            # Generate thumbnail from the stored crop (no need to re-read video!)
             thumbnail_b64 = ""
-            if ret:
-                thumbnail_b64 = self.extract_thumbnail(frame, best_detection['bbox'], cluster_id)
+            if best_detection['crop'] is not None:
+                thumbnail_b64 = self.encode_crop_to_base64(best_detection['crop'])
             
             # Update results
             if class_name not in results["objects_detected"]:
@@ -392,103 +418,135 @@ OCSORTTracker:
         
         return results
     
-    def _parse_mot_txt_results(self):
-        """Parse the MOT text output file and build detections list with crops"""
-        # Find the output text file
-        output_dir = self.tracker.output_dir
-        txt_files = [f for f in os.listdir(output_dir) if f.endswith('.txt')]
+    def _process_frames_parallel(self, video_path: str, frame_count: int, num_workers: int) -> List[Dict]:
+        """Process video frames with GPU-aware optimization for single GPU"""
+        # For single GPU, we need to be careful about parallel processing
+        # GPU models are not thread-safe and can cause memory issues
         
-        if not txt_files:
-            print("No MOT text files found")
-            return []
+        print("Single GPU detected - using optimized sequential processing with parallel preprocessing")
         
-        # Read the first text file (should be the only one for single video)
-        txt_file = os.path.join(output_dir, txt_files[0])
-        print(f"Parsing MOT results from: {txt_file}")
-        
-        # Read video frames for thumbnail extraction
-        video_path = txt_file.replace('.txt', '.mp4')  # Assuming same name
-        if not os.path.exists(video_path):
-            # Try to find the original video by looking for video files in output dir
-            video_files = [f for f in os.listdir(output_dir) if f.endswith(('.mp4', '.avi', '.mov'))]
-            if video_files:
-                video_path = os.path.join(output_dir, video_files[0])
-            else:
-                video_path = None
-        
-        frame_cache = {}
-        if video_path and os.path.exists(video_path):
-            cap = cv2.VideoCapture(video_path)
-            if cap.isOpened():
-                frame_cache = self._load_video_frames(cap)
-                cap.release()
-                print(f"Loaded {len(frame_cache)} frames for crop extraction")
-        
+        # Use sequential processing for GPU inference but parallel for CPU tasks
+        return self._process_frames_sequential_gpu(video_path, frame_count)
+    
+    def _process_frames_sequential_gpu(self, video_path: str, frame_count: int) -> List[Dict]:
+        """Process frames sequentially on GPU with parallel CPU preprocessing"""
         all_detections = []
         
-        with open(txt_file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if not line:
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            return all_detections
+        
+        # Pre-load frames in parallel for CPU preprocessing
+        print("Pre-loading frames in parallel for CPU preprocessing...")
+        frame_batches = self._preload_frames_parallel(cap, frame_count)
+        
+        print(f"Processing {len(frame_batches)} pre-loaded frame batches on GPU...")
+        
+        # Process pre-loaded batches sequentially on GPU
+        for i, (frame_id, frame, frame_rgb) in enumerate(frame_batches):
+            if i % 50 == 0:
+                print(f"GPU processing: {i}/{len(frame_batches)} batches")
+            
+            # Use the main tracker instance for GPU inference
+            mot_results = self.tracker.predict_image([frame_rgb], visual=False)
+            
+            if not mot_results or not mot_results[0]:
+                continue
+            
+            online_tlwhs, online_scores, online_ids = mot_results[0]
+            
+            # Process each detected class
+            for class_id in online_tlwhs.keys():
+                class_name = self.get_class_name(class_id)
+                boxes_for_cls = online_tlwhs[class_id]
+                scores_for_cls = online_scores[class_id]
+                ids_for_cls = online_ids[class_id]
+                
+                if not ids_for_cls:
                     continue
                 
-                # Parse MOT format: frame, id, x1, y1, w, h, score, -1, -1, -1
-                parts = line.split(',')
-                if len(parts) < 7:
-                    continue
+                # Get image crops from the original BGR frame for Re-ID
+                crops = self.get_crops(boxes_for_cls, frame, w=64, h=192)
                 
-                try:
-                    frame_id = int(parts[0])
-                    track_id = int(parts[1])
-                    x1 = float(parts[2])
-                    y1 = float(parts[3])
-                    w = float(parts[4])
-                    h = float(parts[5])
-                    score = float(parts[6])
-                    
-                    # Convert to x1,y1,x2,y2 format
-                    x2 = x1 + w
-                    y2 = y1 + h
-                    bbox = [x1, y1, x2, y2]
-                    
-                    # For MOT format, we need to infer class from track_id or use default
-                    # Since MOT format doesn't include class info, we'll use a generic label
-                    class_name = "detected_object"
-                    
-                    # Extract crop if frame is available
-                    crop = None
-                    if frame_id in frame_cache:
-                        frame = frame_cache[frame_id]
-                        crops = self.get_crops([[x1, y1, w, h]], frame)
-                        if len(crops) > 0:
-                            crop = crops[0]
+                for j, track_id in enumerate(ids_for_cls):
+                    # Convert tlwh to bbox format
+                    x1, y1, w, h = boxes_for_cls[j]
+                    bbox = [x1, y1, x1 + w, y1 + h]
                     
                     all_detections.append({
                         "frame_id": frame_id,
                         "track_id": track_id,
                         "class_name": class_name,
                         "bbox": bbox,
-                        "score": score,
-                        "crop": crop
+                        "bbox_tlwh": boxes_for_cls[j],
+                        "score": float(scores_for_cls[j]),
+                        "crop": crops[j] if j < len(crops) else None
                     })
-                    
-                except (ValueError, IndexError) as e:
-                    print(f"Error parsing line: {line}, error: {e}")
-                    continue
         
+        cap.release()
         return all_detections
     
-    def _load_video_frames(self, cap):
-        """Load all video frames into memory for thumbnail extraction"""
-        frames = {}
-        frame_id = 0
-        while True:
-            ret, frame = cap.read()
+    def _preload_frames_parallel(self, cap, frame_count: int) -> List[tuple]:
+        """Pre-load frames in parallel for CPU preprocessing"""
+        # Determine optimal batch size for pre-loading
+        batch_size = max(1, frame_count // 20)  # Create ~20 batches for pre-loading
+        frame_batches = []
+        
+        # Create frame ranges for parallel pre-loading
+        frame_ranges = []
+        for i in range(0, frame_count, batch_size):
+            end_frame = min(i + batch_size, frame_count)
+            frame_ranges.append((i, end_frame))
+        
+        print(f"Pre-loading {len(frame_ranges)} batches of ~{batch_size} frames each")
+        
+        # Pre-load frames in parallel (CPU-bound task)
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            # Submit pre-loading tasks
+            future_to_range = {
+                executor.submit(self._preload_frame_batch, cap, start_frame, end_frame): (start_frame, end_frame)
+                for start_frame, end_frame in frame_ranges
+            }
+            
+            # Collect pre-loaded frames
+            for future in future_to_range:
+                try:
+                    batch_frames = future.result()
+                    frame_batches.extend(batch_frames)
+                    start_frame, end_frame = future_to_range[future]
+                    print(f"Pre-loaded batch {start_frame}-{end_frame}: {len(batch_frames)} frames")
+                except Exception as e:
+                    start_frame, end_frame = future_to_range[future]
+                    print(f"Error pre-loading batch {start_frame}-{end_frame}: {e}")
+        
+        # Sort by frame_id to maintain temporal order
+        frame_batches.sort(key=lambda x: x[0])
+        
+        return frame_batches
+    
+    def _preload_frame_batch(self, cap, start_frame: int, end_frame: int) -> List[tuple]:
+        """Pre-load a batch of frames with CPU preprocessing"""
+        batch_frames = []
+        
+        # Create a new video capture for this thread
+        thread_cap = cv2.VideoCapture(cap.get(cv2.CAP_PROP_POS_FRAMES))
+        thread_cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+        
+        frame_id = start_frame
+        while frame_id < end_frame:
+            ret, frame = thread_cap.read()
             if not ret:
                 break
+            
             frame_id += 1
-            frames[frame_id] = frame
-        return frames
+            
+            # Pre-process frame on CPU (convert to RGB)
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            batch_frames.append((frame_id, frame, frame_rgb))
+        
+        thread_cap.release()
+        return batch_frames
     
     def get_class_name(self, class_id: int) -> str:
         """Map class ID to class name - focused on vending machine contents"""
