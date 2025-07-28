@@ -23,4 +23,5 @@ build:
       -o weights=https://paddledet.bj.bcebos.com/models/mot/ppyoloe_crn_l_36e_640x640_mot17half.pdparams \
       --output_dir=output_inference"
 
+
 predict: "predict.py:predict"
