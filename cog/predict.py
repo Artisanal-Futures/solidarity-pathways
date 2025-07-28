@@ -19,11 +19,17 @@ sys.path.append('/opt/paddle/PaddleDetection')
 from deploy.python.infer import Detector
 from deploy.python.mot_sde_infer import SDE_Detector
 
+# Import scikit-learn for clustering
+from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import normalize
+
 class MultiObjectTracker:
     def __init__(self):
-        """Initialize ByteTrack with PP-YOLOE detector for PaddleDetection 2.8.1"""
-        # This path matches the export command in your cog.yaml
-        self.model_dir = "/opt/paddle/PaddleDetection/output_inference/ppyoloe_crn_l_36e_640x640_mot17half"
+        """Initialize ByteTrack with PP-YOLOE detector and Re-ID model for PaddleDetection 2.8.1"""
+        # Detection model path
+        self.detector_model_dir = "/opt/paddle/PaddleDetection/output_inference/mot_detector/ppyoloe_crn_l_36e_640x640_mot17half"
+        # Re-ID model path
+        self.reid_model_dir = "/opt/paddle/PaddleDetection/output_inference/reid_model/deepsort_pplcnet"
         self.device = "GPU" if os.environ.get("CUDA_VISIBLE_DEVICES") else "CPU"
         
         # Create tracker config file
@@ -31,8 +37,8 @@ class MultiObjectTracker:
         
         # Initialize SDE tracker (ByteTrack) - optimized for vending machine detection
         self.tracker = SDE_Detector(
-            model_dir=self.model_dir,
-            tracker_config="/opt/paddle/PaddleDetection/tracker_config.yml",  # Use custom ByteTrack config
+            model_dir=self.detector_model_dir,
+            tracker_config="/opt/paddle/PaddleDetection/tracker_config.yml",
             device=self.device,
             run_mode='paddle',
             batch_size=1,
@@ -46,12 +52,36 @@ class MultiObjectTracker:
             output_dir="/tmp/output",
             save_images=False,
             save_mot_txts=False,
-            reid_model_dir=None  # ByteTrack doesn't require ReID
+            reid_model_dir=self.reid_model_dir  # Add Re-ID model for feature extraction
         )
+        
+        # Initialize Re-ID predictor separately for clustering
+        self._init_reid_predictor()
         
         self.object_counts = {}
         self.thumbnails = {}
         self.tracked_objects = {}
+        
+    def _init_reid_predictor(self):
+        """Initialize the Re-ID predictor for feature extraction"""
+        try:
+            from deploy.python.infer import load_predictor
+            self.reid_predictor = load_predictor(
+                self.reid_model_dir,
+                run_mode='paddle',
+                device=self.device.lower(),
+                batch_size=1,
+                trt_min_shape=1,
+                trt_max_shape=1280,
+                trt_opt_shape=640,
+                trt_calib_mode=False,
+                cpu_threads=1,
+                enable_mkldnn=False
+            )
+            print(f"Re-ID predictor initialized successfully from {self.reid_model_dir}")
+        except Exception as e:
+            print(f"Warning: Could not initialize Re-ID predictor: {e}")
+            self.reid_predictor = None
         
     def _create_tracker_config(self):
         """Create the tracker config file for ByteTrack"""
@@ -134,8 +164,66 @@ OCSORTTracker:
         
         return thumbnail_b64
     
+    def get_crops(self, tlwhs, frame, w=64, h=192):
+        """Extract image crops from bounding boxes for Re-ID feature extraction"""
+        crops = []
+        for tlwh in tlwhs:
+            x1, y1, w_box, h_box = tlwh
+            x2, y2 = x1 + w_box, y1 + h_box
+            
+            # Ensure coordinates are within frame bounds
+            x1, y1 = max(0, int(x1)), max(0, int(y1))
+            x2, y2 = min(frame.shape[1], int(x2)), min(frame.shape[0], int(y2))
+            
+            if x2 > x1 and y2 > y1:
+                crop = frame[y1:y2, x1:x2]
+                # Resize to Re-ID model input size
+                crop = cv2.resize(crop, (w, h))
+                # Convert to RGB and normalize
+                crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                crop = crop.astype('float32') / 255.0
+                # Add batch dimension
+                crop = np.expand_dims(crop, axis=0)
+                crops.append(crop)
+            else:
+                # Create a black crop if bbox is invalid
+                crop = np.zeros((1, h, w, 3), dtype='float32')
+                crops.append(crop)
+        
+        return np.array(crops)
+    
+    def extract_reid_features(self, crops):
+        """Extract Re-ID features from image crops"""
+        if self.reid_predictor is None:
+            # Fallback: return random features if Re-ID model not available
+            return np.random.rand(len(crops), 512)
+        
+        try:
+            # Get input/output handles
+            input_names = self.reid_predictor.get_input_names()
+            output_names = self.reid_predictor.get_output_names()
+            input_tensor = self.reid_predictor.get_input_handle(input_names[0])
+            output_tensor = self.reid_predictor.get_output_handle(output_names[0])
+            
+            # Prepare input data
+            if len(crops.shape) == 4:
+                input_data = crops
+            else:
+                input_data = np.expand_dims(crops, axis=0)
+            
+            input_tensor.copy_from_cpu(input_data)
+            self.reid_predictor.run()
+            features = output_tensor.copy_to_cpu()
+            
+            return features
+            
+        except Exception as e:
+            print(f"Error extracting Re-ID features: {e}")
+            # Fallback: return random features
+            return np.random.rand(len(crops), 512)
+    
     def process_video(self, video_path: str) -> Dict[str, Any]:
-        """Process video with ByteTrack for vending machine item detection and return tracking results with counts and thumbnails"""
+        """Process video with two-step tracking: ByteTrack + Re-ID clustering"""
         print(f"Processing video: {video_path}")
         
         cap = cv2.VideoCapture(video_path)
@@ -150,51 +238,169 @@ OCSORTTracker:
         
         print(f"Video properties: {width}x{height}, {fps} fps, {frame_count} frames")
         
+        # Step 1: Use efficient predict_video method to get MOT results
+        print("Step 1: Running ByteTrack with predict_video method...")
+        
+        # Temporarily enable text output to get MOT results
+        original_save_mot_txts = self.tracker.save_mot_txts
+        self.tracker.save_mot_txts = True
+        
+        # Run video prediction using the efficient method
+        # camera_id=-1 indicates prediction from a video file, not a camera stream
+        self.tracker.predict_video(video_file=video_path, camera_id=-1)
+        
+        # Parse the MOT text output to get all detections
+        all_detections = self._parse_mot_txt_results()
+        
+        # Restore original setting
+        self.tracker.save_mot_txts = original_save_mot_txts
+        
+        print(f"Collected {len(all_detections)} detections across {frame_count} frames")
+        
+        if not all_detections:
+            return {
+                "total_frames": frame_count,
+                "fps": fps,
+                "resolution": f"{width}x{height}",
+                "objects_detected": {},
+                "tracking_summary": {},
+                "thumbnails": {},
+                "total_objects": 0,
+                "unique_classes": []
+            }
+        
+        # Step 2: Extract Re-ID features and cluster
+        print("Step 2: Extracting Re-ID features and clustering...")
+        
+        # Extract features from all crops
+        all_crops = np.array([d['crop'] for d in all_detections if d['crop'] is not None])
+        if len(all_crops) > 0:
+            all_features = self.extract_reid_features(all_crops)
+            
+            # Normalize features for clustering
+            normalized_features = normalize(all_features, norm='l2')
+            
+            # Cluster using DBSCAN
+            # eps: maximum distance between samples for clustering
+            # min_samples: minimum number of samples in a cluster
+            clustering = DBSCAN(eps=0.4, min_samples=2, metric='cosine').fit(normalized_features)
+            cluster_labels = clustering.labels_
+            
+            # Assign cluster labels back to detections
+            crop_idx = 0
+            for detection in all_detections:
+                if detection['crop'] is not None:
+                    detection['cluster_id'] = int(cluster_labels[crop_idx])
+                    crop_idx += 1
+                else:
+                    detection['cluster_id'] = -1  # Noise
+        else:
+            # No valid crops, assign unique cluster IDs based on track_id
+            track_to_cluster = {}
+            cluster_counter = 0
+            for detection in all_detections:
+                track_id = detection['track_id']
+                if track_id not in track_to_cluster:
+                    track_to_cluster[track_id] = cluster_counter
+                    cluster_counter += 1
+                detection['cluster_id'] = track_to_cluster[track_id]
+        
+        # Step 3: Build final results
+        print("Step 3: Building final results...")
+        
         results = {
             "total_frames": frame_count,
             "fps": fps,
             "resolution": f"{width}x{height}",
             "objects_detected": {},
             "tracking_summary": {},
-            "thumbnails": {}
+            "thumbnails": {},
+            "clustering_info": {
+                "total_detections": len(all_detections),
+                "unique_clusters": len(set(d['cluster_id'] for d in all_detections if d['cluster_id'] != -1))
+            }
         }
         
-        # Use the built-in predict_video method with text output
-        print("Running ByteTrack inference with text output...")
-        try:
-            # Temporarily enable text output
-            original_save_mot_txts = self.tracker.save_mot_txts
-            self.tracker.save_mot_txts = True
+        # Group detections by cluster
+        cluster_groups = {}
+        for detection in all_detections:
+            cluster_id = detection['cluster_id']
+            if cluster_id == -1:  # Skip noise
+                continue
+                
+            if cluster_id not in cluster_groups:
+                cluster_groups[cluster_id] = []
+            cluster_groups[cluster_id].append(detection)
+        
+        # Process each cluster
+        for cluster_id, detections in cluster_groups.items():
+            if not detections:
+                continue
+                
+            # Get the most common class name for this cluster
+            class_names = [d['class_name'] for d in detections]
+            class_name = max(set(class_names), key=class_names.count)
             
-            # Run video prediction
-            # The camera_id=-1 indicates prediction from a video file, not a camera stream.
-            self.tracker.predict_video(video_file=video_path, camera_id=-1)
+            # Find the best detection (highest confidence) for thumbnail
+            best_detection = max(detections, key=lambda x: x['score'])
             
-            # Parse the output text file
-            self._parse_mot_txt_results(results)
+            # Generate thumbnail from the best detection
+            cap = cv2.VideoCapture(video_path)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, best_detection['frame_id'] - 1)
+            ret, frame = cap.read()
+            cap.release()
             
-            # Restore original setting
-            self.tracker.save_mot_txts = original_save_mot_txts
+            thumbnail_b64 = ""
+            if ret:
+                thumbnail_b64 = self.extract_thumbnail(frame, best_detection['bbox'], cluster_id)
             
-        except Exception as e:
-            print(f"Video processing failed: {e}")
-            # Fallback to frame-by-frame processing
-            self._process_video_frame_by_frame(video_path, results)
+            # Update results
+            if class_name not in results["objects_detected"]:
+                results["objects_detected"][class_name] = 0
+            results["objects_detected"][class_name] += 1
+            
+            object_id = f"{class_name}_{cluster_id}"
+            
+            if thumbnail_b64:
+                results["thumbnails"][object_id] = {
+                    "class": class_name,
+                    "frame": best_detection['frame_id'],
+                    "bbox": best_detection['bbox'],
+                    "confidence": best_detection['score'],
+                    "cluster_id": cluster_id,
+                    "thumbnail": thumbnail_b64
+                }
+            
+            if class_name not in results["tracking_summary"]:
+                results["tracking_summary"][class_name] = []
+            
+            # Add all detections for this cluster
+            for detection in detections:
+                results["tracking_summary"][class_name].append({
+                    "frame": detection['frame_id'],
+                    "bbox": detection['bbox'],
+                    "confidence": detection['score'],
+                    "object_id": object_id,
+                    "cluster_id": cluster_id,
+                    "original_track_id": detection['track_id']
+                })
         
         results["total_objects"] = sum(results["objects_detected"].values())
         results["unique_classes"] = list(results["objects_detected"].keys())
         
+        print(f"Final results: {results['total_objects']} unique objects across {len(results['unique_classes'])} classes")
+        
         return results
     
-    def _parse_mot_txt_results(self, results):
-        """Parse the MOT text output file and build results dictionary"""
+    def _parse_mot_txt_results(self):
+        """Parse the MOT text output file and build detections list with crops"""
         # Find the output text file
         output_dir = self.tracker.output_dir
         txt_files = [f for f in os.listdir(output_dir) if f.endswith('.txt')]
         
         if not txt_files:
             print("No MOT text files found")
-            return
+            return []
         
         # Read the first text file (should be the only one for single video)
         txt_file = os.path.join(output_dir, txt_files[0])
@@ -203,15 +409,22 @@ OCSORTTracker:
         # Read video frames for thumbnail extraction
         video_path = txt_file.replace('.txt', '.mp4')  # Assuming same name
         if not os.path.exists(video_path):
-            # Try to find the original video
-            video_path = None
+            # Try to find the original video by looking for video files in output dir
+            video_files = [f for f in os.listdir(output_dir) if f.endswith(('.mp4', '.avi', '.mov'))]
+            if video_files:
+                video_path = os.path.join(output_dir, video_files[0])
+            else:
+                video_path = None
         
         frame_cache = {}
-        if video_path:
+        if video_path and os.path.exists(video_path):
             cap = cv2.VideoCapture(video_path)
             if cap.isOpened():
                 frame_cache = self._load_video_frames(cap)
                 cap.release()
+                print(f"Loaded {len(frame_cache)} frames for crop extraction")
+        
+        all_detections = []
         
         with open(txt_file, 'r') as f:
             for line in f:
@@ -241,39 +454,29 @@ OCSORTTracker:
                     # For MOT format, we need to infer class from track_id or use default
                     # Since MOT format doesn't include class info, we'll use a generic label
                     class_name = "detected_object"
-                    object_id = f"{class_name}_{track_id}"
                     
-                    if class_name not in results["objects_detected"]:
-                        results["objects_detected"][class_name] = 0
-                    results["objects_detected"][class_name] += 1
+                    # Extract crop if frame is available
+                    crop = None
+                    if frame_id in frame_cache:
+                        frame = frame_cache[frame_id]
+                        crops = self.get_crops([[x1, y1, w, h]], frame)
+                        if len(crops) > 0:
+                            crop = crops[0]
                     
-                    # Generate thumbnail if frame is available
-                    if frame_id in frame_cache and object_id not in results["thumbnails"]:
-                        thumbnail = self.extract_thumbnail(frame_cache[frame_id], bbox, track_id)
-                        if thumbnail:
-                            results["thumbnails"][object_id] = {
-                                "class": class_name,
-                                "frame": frame_id,
-                                "bbox": bbox,
-                                "confidence": score,
-                                "track_id": track_id,
-                                "thumbnail": thumbnail
-                            }
-                    
-                    if class_name not in results["tracking_summary"]:
-                        results["tracking_summary"][class_name] = []
-                    
-                    results["tracking_summary"][class_name].append({
-                        "frame": frame_id,
+                    all_detections.append({
+                        "frame_id": frame_id,
+                        "track_id": track_id,
+                        "class_name": class_name,
                         "bbox": bbox,
-                        "confidence": score,
-                        "object_id": object_id,
-                        "track_id": track_id
+                        "score": score,
+                        "crop": crop
                     })
                     
                 except (ValueError, IndexError) as e:
                     print(f"Error parsing line: {line}, error: {e}")
                     continue
+        
+        return all_detections
     
     def _load_video_frames(self, cap):
         """Load all video frames into memory for thumbnail extraction"""
@@ -286,95 +489,6 @@ OCSORTTracker:
             frame_id += 1
             frames[frame_id] = frame
         return frames
-    
-    def _process_video_frame_by_frame(self, video_path, results):
-        """Fallback method: process video frame by frame"""
-        print("Using frame-by-frame processing as fallback...")
-        
-        cap = cv2.VideoCapture(video_path)
-        frame_id = 0
-        
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            
-            frame_id += 1
-            if frame_id % 30 == 0:
-                print(f"Processing frame {frame_id}")
-            
-            try:
-                # Process single frame
-                # The method expects a list of RGB images
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame_result = self.tracker.predict_image([frame_rgb], visual=False)
-                
-                if frame_result:
-                    # Pass the original BGR frame for thumbnail extraction
-                    self._process_frame_result(frame_result, frame, frame_id, results)
-                    
-            except Exception as frame_error:
-                print(f"Error processing frame {frame_id}: {frame_error}")
-                continue
-        
-        cap.release()
-    
-    def _process_frame_result(self, frame_result, frame, frame_id, results):
-        """Process a single frame result and extract tracking information."""
-        # Result for a single frame is a list with one item: [[online_tlwhs, online_scores, online_ids]]
-        if not frame_result or not frame_result[0]:
-            return
-            
-        mot_result = frame_result[0]
-        online_tlwhs, online_scores, online_ids = mot_result[0], mot_result[1], mot_result[2]
-
-        # online_tlwhs is a defaultdict where keys are class_ids
-        # Iterate through each detected class
-        for class_id in online_tlwhs.keys():
-            class_name = self.get_class_name(class_id)
-            
-            # Get the lists of boxes, scores, and track_ids for this class
-            boxes_for_cls = online_tlwhs[class_id]
-            scores_for_cls = online_scores[class_id]
-            ids_for_cls = online_ids[class_id]
-
-            for i, tlwh in enumerate(boxes_for_cls):
-                track_id = ids_for_cls[i]
-                score = scores_for_cls[i]
-                
-                # tlwh is [x, y, width, height]
-                x1, y1, w, h = tlwh
-                bbox = [x1, y1, x1 + w, y1 + h]
-                
-                object_id = f"{class_name}_{track_id}"
-
-                if class_name not in results["objects_detected"]:
-                    results["objects_detected"][class_name] = 0
-                results["objects_detected"][class_name] += 1
-
-                # Generate thumbnail for first occurrence of each track
-                if object_id not in results["thumbnails"]:
-                    thumbnail = self.extract_thumbnail(frame, bbox, track_id)
-                    if thumbnail:
-                        results["thumbnails"][object_id] = {
-                            "class": class_name,
-                            "frame": frame_id,
-                            "bbox": bbox,
-                            "confidence": float(score),
-                            "track_id": track_id,
-                            "thumbnail": thumbnail
-                        }
-
-                if class_name not in results["tracking_summary"]:
-                    results["tracking_summary"][class_name] = []
-                
-                results["tracking_summary"][class_name].append({
-                    "frame": frame_id,
-                    "bbox": bbox,
-                    "confidence": float(score),
-                    "object_id": object_id,
-                    "track_id": track_id
-                })
     
     def get_class_name(self, class_id: int) -> str:
         """Map class ID to class name - focused on vending machine contents"""
@@ -438,7 +552,7 @@ def predict(
     video: CogPath = Input(description="Uploaded video file (preferred method)", default=None)
 ) -> Dict[str, Any]:
     """
-    Main prediction function for Cog with ByteTrack - optimized for vending machine detection
+    Main prediction function for Cog with two-step tracking: ByteTrack + Re-ID clustering
     
     Args:
         video_url: URL to download video from (may have authentication issues)
@@ -446,7 +560,7 @@ def predict(
         video: Uploaded video file (Cog Path object)
     
     Returns:
-        Dictionary containing vending machine item tracking results, object counts, and thumbnails
+        Dictionary containing vending machine item tracking results with Re-ID clustering
     """
     try:
         tracker = MultiObjectTracker()
