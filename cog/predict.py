@@ -448,12 +448,9 @@ OCSORTTracker:
         if not cap.isOpened():
             return all_detections
         
-        # Store video path for parallel processing
-        cap._video_path = video_path
-        
         # Pre-load frames in parallel for CPU preprocessing
         print("Pre-loading frames in parallel for CPU preprocessing...")
-        frame_batches = self._preload_frames_parallel(cap, frame_count)
+        frame_batches = self._preload_frames_parallel(video_path, frame_count)
         
         print(f"Processing {len(frame_batches)} pre-loaded frame batches on GPU...")
         
@@ -501,14 +498,13 @@ OCSORTTracker:
         cap.release()
         return all_detections
     
-    def _preload_frames_parallel(self, cap, frame_count: int) -> List[tuple]:
+    def _preload_frames_parallel(self, video_path: str, frame_count: int) -> List[tuple]:
         """Pre-load frames in parallel for CPU preprocessing"""
-        # Get the video path from the capture object
-        video_path = getattr(cap, '_video_path', None)
         if video_path is None:
-            # If we can't get the path, fall back to sequential processing
-            print("Warning: Cannot get video path for parallel pre-loading, using sequential processing")
-            return self._preload_frames_sequential(cap, frame_count)
+            raise ValueError("Video path is required for frame pre-loading")
+        
+        if not os.path.exists(video_path):
+            raise FileNotFoundError(f"Video file not found: {video_path}")
         
         # Determine optimal batch size for pre-loading
         batch_size = max(1, frame_count // 20)  # Create ~20 batches for pre-loading
@@ -573,11 +569,22 @@ OCSORTTracker:
         thread_cap.release()
         return batch_frames
     
-    def _preload_frames_sequential(self, cap, frame_count: int) -> List[tuple]:
+    def _preload_frames_sequential(self, video_path: str, frame_count: int) -> List[tuple]:
         """Fallback sequential frame pre-loading when parallel processing fails"""
+        if video_path is None:
+            raise ValueError("Video path is required for sequential frame pre-loading")
+        
+        if not os.path.exists(video_path):
+            raise FileNotFoundError(f"Video file not found: {video_path}")
+        
         frame_batches = []
         
         print("Using sequential frame pre-loading...")
+        
+        # Create a new video capture for sequential processing
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise RuntimeError(f"Could not open video file: {video_path}")
         
         # Process frames sequentially
         frame_id = 0
@@ -596,6 +603,7 @@ OCSORTTracker:
             if frame_id % 50 == 0:
                 print(f"Sequential pre-loading: {frame_id}/{frame_count} frames")
         
+        cap.release()
         return frame_batches
     
     def get_class_name(self, class_id: int) -> str:
