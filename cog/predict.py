@@ -182,6 +182,20 @@ OCSORTTracker:
     def get_crops(self, tlwhs, frame, w=64, h=192):
         """Extracts and resizes image crops from bounding boxes."""
         crops = []
+        
+        # Validate expected crop dimensions
+        expected_shape = (h, w, 3)  # Height, Width, Channels (RGB)
+        print(f"Expected crop shape: {expected_shape}")
+        
+        # Pre-define normalization arrays as float32 to avoid dtype issues
+        # This prevents NumPy from upcasting to float64 during arithmetic operations
+        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        
+        if len(tlwhs) == 0:
+            print("Warning: No bounding boxes provided for cropping")
+            return np.array(crops, dtype=np.float32)
+        
         for tlwh in tlwhs:
             x, y, w_box, h_box = map(int, tlwh)
             
@@ -199,19 +213,29 @@ OCSORTTracker:
                     resized_crop = cv2.cvtColor(resized_crop, cv2.COLOR_BGR2RGB)
                     
                     # Apply normalization according to ImageNet standards (common for Re-ID models)
-                    # Mean: [0.485, 0.456, 0.406], Std: [0.229, 0.224, 0.225]
+                    # Ensure all operations use float32 to prevent dtype mismatches
                     resized_crop = resized_crop.astype('float32') / 255.0
-                    resized_crop = (resized_crop - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
+                    resized_crop = (resized_crop - mean) / std
                     
                     # Add batch dimension
                     resized_crop = np.expand_dims(resized_crop, axis=0)
                     crops.append(resized_crop)
                 else:
+                    print(f"Warning: Empty crop for bbox {tlwh}")
                     crops.append(np.zeros((1, h, w, 3), dtype='float32'))
             else:
+                print(f"Warning: Invalid bbox dimensions {tlwh}")
                 crops.append(np.zeros((1, h, w, 3), dtype='float32'))
         
-        return np.array(crops)
+        # Validate overall crop dimensions once
+        crops_array = np.array(crops, dtype=np.float32)
+        expected_batch_shape = (len(crops), 1, h, w, 3)
+        
+        if crops_array.shape != expected_batch_shape:
+            raise ValueError(f"Crops array shape mismatch: expected {expected_batch_shape}, got {crops_array.shape}")
+        
+        print(f"Crops validation passed: {len(crops)} crops with shape {crops_array.shape}")
+        return crops_array
     
     def encode_crop_to_base64(self, crop):
         """Convert a crop array to base64 encoded JPEG string"""
@@ -244,6 +268,14 @@ OCSORTTracker:
         if self.reid_predictor is None:
             raise RuntimeError("Re-ID predictor not initialized. Cannot extract features.")
         
+        # Validate input crops
+        if crops is None or len(crops) == 0:
+            raise ValueError("No crops provided for Re-ID feature extraction")
+        
+        # Expected shape for Re-ID model: (batch_size, 1, height, width, channels)
+        # where height=192, width=64, channels=3
+        expected_shape = (192, 64, 3)  # Height, Width, Channels
+        
         try:
             # Get input/output handles
             input_names = self.reid_predictor.get_input_names()
@@ -256,6 +288,21 @@ OCSORTTracker:
                 input_data = crops
             else:
                 input_data = np.expand_dims(crops, axis=0)
+            
+            # Ensure input data is float32 to prevent dtype mismatches with model weights
+            input_data = input_data.astype(np.float32)
+            
+            # Validate input data shape for Re-ID model
+            if len(input_data.shape) != 4:
+                raise ValueError(f"Expected 4D input data, got shape {input_data.shape}")
+            
+            # Validate the spatial dimensions (batch_size, channels, height, width)
+            batch_size, channels, height, width = input_data.shape
+            if height != 192 or width != 64 or channels != 3:
+                raise ValueError(f"Expected input shape (batch_size, 3, 192, 64), got {input_data.shape}")
+            
+            # Debug: Log data type and shape before inference
+            print(f"Re-ID input data shape: {input_data.shape}, dtype: {input_data.dtype}")
             
             # Apply preprocessing if configuration is available
             if hasattr(self, 'reid_pred_config') and self.reid_pred_config:
@@ -338,9 +385,27 @@ OCSORTTracker:
         if len(all_crops) == 0:
             raise RuntimeError("No valid image crops found for Re-ID feature extraction. Cannot proceed with clustering.")
         
+        # Validate crop dimensions before Re-ID processing
+        expected_crop_shape = (1, 192, 64, 3)  # (batch, height, width, channels)
+        if all_crops.shape[1:] != expected_crop_shape[1:]:
+            raise ValueError(f"Crop shape mismatch: expected {expected_crop_shape[1:]}, got {all_crops.shape[1:]}")
+        
+        print(f"Crop validation passed: {all_crops.shape}")
+        
         print(f"Extracting Re-ID features from {len(all_crops)} crops...")
         all_features = self.extract_reid_features(all_crops)
         print(f"Re-ID features extracted successfully: {all_features.shape}")
+        
+        # Validate Re-ID feature dimensions
+        if len(all_features.shape) != 2:
+            raise ValueError(f"Expected 2D feature array, got shape {all_features.shape}")
+        
+        expected_features = len(all_crops)
+        actual_features = all_features.shape[0]
+        if actual_features != expected_features:
+            raise ValueError(f"Feature count mismatch: expected {expected_features}, got {actual_features}")
+        
+        print(f"Re-ID feature validation passed: {all_features.shape[0]} features with {all_features.shape[1]} dimensions")
         
         # Add features back to detections
         crop_idx = 0
@@ -361,6 +426,12 @@ OCSORTTracker:
         unique_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
         noise_points = list(cluster_labels).count(-1)
         print(f"Clustering complete: {unique_clusters} clusters, {noise_points} noise points")
+        
+        # Validate clustering results
+        if len(cluster_labels) != len(all_features):
+            raise ValueError(f"Cluster labels count mismatch: expected {len(all_features)}, got {len(cluster_labels)}")
+        
+        print(f"Clustering validation passed: {len(cluster_labels)} labels assigned")
         
         # Assign cluster labels back to detections
         crop_idx = 0
