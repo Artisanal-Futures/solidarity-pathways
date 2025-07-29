@@ -19,7 +19,7 @@ from cog import BasePredictor, Input, Path as CogPath
 sys.path.append('/opt/paddle/PaddleDetection')
 
 # ByteTrack imports for PaddleDetection 2.8.1
-from deploy.python.infer import Detector
+from deploy.python.infer import Detector, load_predictor, PredictConfig
 from deploy.python.mot_sde_infer import SDE_Detector
 
 # Import scikit-learn for clustering
@@ -67,24 +67,33 @@ class MultiObjectTracker:
         
     def _init_reid_predictor(self):
         """Initialize the Re-ID predictor for feature extraction"""
+        if not self.reid_model_dir or not os.path.exists(self.reid_model_dir):
+            raise RuntimeError(f"Re-ID model directory not found: {self.reid_model_dir}. Re-ID is required for object clustering.")
+
         try:
-            from deploy.python.infer import load_predictor
-            self.reid_predictor = load_predictor(
+            # Step 1: Load the model's configuration from its infer_cfg.yml file.
+            # The PredictConfig class handles this automatically.
+            self.reid_pred_config = PredictConfig(self.reid_model_dir)
+
+            # Step 2: Initialize the predictor using the loaded configuration.
+            self.reid_predictor, _ = load_predictor(
                 self.reid_model_dir,
                 run_mode='paddle',
-                device=self.device.lower(),
-                batch_size=1,
+                batch_size=50,  # ReID is often batched on crops, 50 is a common value
+                device=self.device,
+                min_subgraph_size=self.reid_pred_config.min_subgraph_size,
+                use_dynamic_shape=self.reid_pred_config.use_dynamic_shape,
                 trt_min_shape=1,
                 trt_max_shape=1280,
                 trt_opt_shape=640,
                 trt_calib_mode=False,
                 cpu_threads=1,
-                enable_mkldnn=False
+                enable_mkldnn=False,
             )
             print(f"Re-ID predictor initialized successfully from {self.reid_model_dir}")
+
         except Exception as e:
-            print(f"Warning: Could not initialize Re-ID predictor: {e}")
-            self.reid_predictor = None
+            raise RuntimeError(f"Failed to initialize Re-ID predictor: {e}. Re-ID is required for object clustering.")
         
     def _create_tracker_config(self):
         """Create the tracker config file for ByteTrack"""
@@ -185,7 +194,12 @@ OCSORTTracker:
                     resized_crop = cv2.resize(crop, (w, h))
                     # Convert to RGB and normalize for Re-ID model
                     resized_crop = cv2.cvtColor(resized_crop, cv2.COLOR_BGR2RGB)
+                    
+                    # Apply normalization according to ImageNet standards (common for Re-ID models)
+                    # Mean: [0.485, 0.456, 0.406], Std: [0.229, 0.224, 0.225]
                     resized_crop = resized_crop.astype('float32') / 255.0
+                    resized_crop = (resized_crop - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
+                    
                     # Add batch dimension
                     resized_crop = np.expand_dims(resized_crop, axis=0)
                     crops.append(resized_crop)
@@ -225,8 +239,7 @@ OCSORTTracker:
     def extract_reid_features(self, crops):
         """Extract Re-ID features from image crops"""
         if self.reid_predictor is None:
-            # Fallback: return random features if Re-ID model not available
-            return np.random.rand(len(crops), 512)
+            raise RuntimeError("Re-ID predictor not initialized. Cannot extract features.")
         
         try:
             # Get input/output handles
@@ -235,11 +248,17 @@ OCSORTTracker:
             input_tensor = self.reid_predictor.get_input_handle(input_names[0])
             output_tensor = self.reid_predictor.get_output_handle(output_names[0])
             
-            # Prepare input data
+            # Prepare input data using the Re-ID model's preprocessing configuration
             if len(crops.shape) == 4:
                 input_data = crops
             else:
                 input_data = np.expand_dims(crops, axis=0)
+            
+            # Apply preprocessing if configuration is available
+            if hasattr(self, 'reid_pred_config') and self.reid_pred_config:
+                # The crops should already be preprocessed according to the model's requirements
+                # (resized to 64x192, normalized, etc.) from the get_crops method
+                pass
             
             input_tensor.copy_from_cpu(input_data)
             self.reid_predictor.run()
@@ -248,9 +267,7 @@ OCSORTTracker:
             return features
             
         except Exception as e:
-            print(f"Error extracting Re-ID features: {e}")
-            # Fallback: return random features
-            return np.random.rand(len(crops), 512)
+            raise RuntimeError(f"Failed to extract Re-ID features: {e}")
     
     def process_video(self, video_path: str) -> Dict[str, Any]:
         """
@@ -300,41 +317,33 @@ OCSORTTracker:
         
         # Extract features from all crops
         all_crops = np.array([d['crop'] for d in all_detections if d['crop'] is not None])
-        if len(all_crops) > 0:
-            all_features = self.extract_reid_features(all_crops)
-            
-            # Add features back to detections
-            crop_idx = 0
-            for detection in all_detections:
-                if detection['crop'] is not None:
-                    detection['feature'] = all_features[crop_idx]
-                    crop_idx += 1
-            
-            # Normalize features for clustering
-            normalized_features = normalize(all_features, norm='l2')
-            
-            # Cluster using DBSCAN
-            clustering = DBSCAN(eps=0.4, min_samples=2, metric='cosine').fit(normalized_features)
-            cluster_labels = clustering.labels_
-            
-            # Assign cluster labels back to detections
-            crop_idx = 0
-            for detection in all_detections:
-                if detection['crop'] is not None:
-                    detection['cluster_id'] = int(cluster_labels[crop_idx])
-                    crop_idx += 1
-                else:
-                    detection['cluster_id'] = -1  # Noise
-        else:
-            # No valid crops, assign unique cluster IDs based on track_id
-            track_to_cluster = {}
-            cluster_counter = 0
-            for detection in all_detections:
-                track_id = detection['track_id']
-                if track_id not in track_to_cluster:
-                    track_to_cluster[track_id] = cluster_counter
-                    cluster_counter += 1
-                detection['cluster_id'] = track_to_cluster[track_id]
+        if len(all_crops) == 0:
+            raise RuntimeError("No valid image crops found for Re-ID feature extraction. Cannot proceed with clustering.")
+        
+        all_features = self.extract_reid_features(all_crops)
+        
+        # Add features back to detections
+        crop_idx = 0
+        for detection in all_detections:
+            if detection['crop'] is not None:
+                detection['feature'] = all_features[crop_idx]
+                crop_idx += 1
+        
+        # Normalize features for clustering
+        normalized_features = normalize(all_features, norm='l2')
+        
+        # Cluster using DBSCAN
+        clustering = DBSCAN(eps=0.4, min_samples=2, metric='cosine').fit(normalized_features)
+        cluster_labels = clustering.labels_
+        
+        # Assign cluster labels back to detections
+        crop_idx = 0
+        for detection in all_detections:
+            if detection['crop'] is not None:
+                detection['cluster_id'] = int(cluster_labels[crop_idx])
+                crop_idx += 1
+            else:
+                detection['cluster_id'] = -1  # Noise
         
         # --- Step 3: Build Final Results ---
         print("Step 3: Building final results...")
