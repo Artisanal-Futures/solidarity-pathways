@@ -27,13 +27,18 @@ from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import normalize
 
 class MultiObjectTracker:
-    def __init__(self):
+    def __init__(self, debug_mode=False):
         """Initialize ByteTrack with PP-YOLOE detector and Re-ID model for PaddleDetection 2.8.1"""
         # Detection model path
         self.detector_model_dir = "/opt/paddle/PaddleDetection/output_inference/mot_detector/ppyoloe_crn_l_36e_640x640_mot17half"
         # Re-ID model path
         self.reid_model_dir = "/opt/paddle/PaddleDetection/output_inference/reid_model/deepsort_pplcnet"
         self.device = "GPU" if os.environ.get("CUDA_VISIBLE_DEVICES") else "CPU"
+        
+        # Debug mode for detailed validation output
+        self.debug_mode = debug_mode
+        if self.debug_mode:
+            print("🔍 Debug mode enabled - detailed validation output will be shown")
         
         # Create tracker config file
         self._create_tracker_config()
@@ -179,6 +184,495 @@ OCSORTTracker:
         
         return thumbnail_b64
     
+    def get_validation_summary(self):
+        """
+        Get a comprehensive summary of the validation status and pipeline configuration.
+        This is useful for monitoring and debugging.
+        """
+        summary = {
+            "pipeline_status": "initialized",
+            "validation_checks": {},
+            "model_configuration": {},
+            "debug_mode": self.debug_mode
+        }
+        
+        # Check Re-ID model status
+        try:
+            if hasattr(self, 'reid_predictor') and self.reid_predictor:
+                summary["validation_checks"]["reid_model"] = "✓ Initialized"
+                if hasattr(self, 'expected_reid_input_shape'):
+                    summary["model_configuration"]["reid_input_shape"] = str(self.expected_reid_input_shape)
+                if hasattr(self, 'expected_reid_output_shape'):
+                    summary["model_configuration"]["reid_output_shape"] = str(self.expected_reid_output_shape)
+            else:
+                summary["validation_checks"]["reid_model"] = "✗ Not initialized"
+        except Exception as e:
+            summary["validation_checks"]["reid_model"] = f"✗ Error: {str(e)}"
+        
+        # Check tracker status
+        try:
+            if hasattr(self, 'tracker') and self.tracker:
+                summary["validation_checks"]["tracker"] = "✓ Initialized"
+            else:
+                summary["validation_checks"]["tracker"] = "✗ Not initialized"
+        except Exception as e:
+            summary["validation_checks"]["tracker"] = f"✗ Error: {str(e)}"
+        
+        # Check expected configurations
+        if hasattr(self, 'expected_crop_shape'):
+            summary["model_configuration"]["expected_crop_shape"] = str(self.expected_crop_shape)
+        if hasattr(self, 'imagenet_mean'):
+            summary["model_configuration"]["imagenet_mean"] = str(self.imagenet_mean.tolist())
+        if hasattr(self, 'imagenet_std'):
+            summary["model_configuration"]["imagenet_std"] = str(self.imagenet_std.tolist())
+        
+        return summary
+    
+    def _run_self_tests(self):
+        """
+        Run comprehensive self-tests to validate the Re-ID preprocessing pipeline.
+        This ensures all validation logic works correctly during initialization.
+        """
+        print("=== Running Re-ID Pipeline Self-Tests ===")
+        
+        # Test 1: Validate tensor dimension validation
+        print("\nTest 1: Tensor dimension validation")
+        try:
+            test_tensor = np.random.rand(3, 192, 64, 3).astype(np.float32)
+            self.validate_tensor_dimensions(test_tensor, "test_tensor", (3, 192, 64, 3), np.float32)
+            print("✓ Tensor dimension validation passed")
+        except Exception as e:
+            print(f"✗ Tensor dimension validation failed: {e}")
+            return False
+        
+        # Test 2: Validate crop dimension fixing
+        print("\nTest 2: Crop dimension fixing")
+        try:
+            # Test 5D input (problematic case)
+            problematic_crops = np.random.rand(3, 1, 192, 64, 3).astype(np.float32)
+            fixed_crops = self.validate_and_fix_crop_dimensions(problematic_crops)
+            if fixed_crops.shape == (3, 3, 192, 64):
+                print("✓ Crop dimension fixing passed")
+            else:
+                print(f"✗ Crop dimension fixing failed: expected (3, 3, 192, 64), got {fixed_crops.shape}")
+                return False
+        except Exception as e:
+            print(f"✗ Crop dimension fixing failed: {e}")
+            return False
+        
+        # Test 3: Validate Re-ID preprocessing
+        print("\nTest 3: Re-ID preprocessing validation")
+        try:
+            # Create correctly preprocessed crops (ImageNet normalized)
+            correct_crops = np.random.rand(3, 192, 64, 3).astype(np.float32)
+            # Apply ImageNet normalization
+            mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+            std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+            correct_crops = (correct_crops - mean) / std
+            
+            processed_crops = self.validate_reid_preprocessing(correct_crops)
+            if processed_crops.shape == (3, 3, 192, 64):
+                print("✓ Re-ID preprocessing validation passed")
+            else:
+                print(f"✗ Re-ID preprocessing failed: expected (3, 3, 192, 64), got {processed_crops.shape}")
+                return False
+        except Exception as e:
+            print(f"✗ Re-ID preprocessing validation failed: {e}")
+            return False
+        
+        # Test 4: Validate Re-ID feature validation
+        print("\nTest 4: Re-ID feature validation")
+        try:
+            # Create reasonable features
+            good_features = np.random.rand(3, 512).astype(np.float32)
+            self.validate_reid_features(good_features, 3)
+            print("✓ Re-ID feature validation passed")
+        except Exception as e:
+            print(f"✗ Re-ID feature validation failed: {e}")
+            return False
+        
+        # Test 5: Test error cases
+        print("\nTest 5: Error case validation")
+        try:
+            # Test wrong dimensions
+            wrong_crops = np.random.rand(3, 64, 192, 3).astype(np.float32)  # Wrong height/width
+            try:
+                self.validate_reid_preprocessing(wrong_crops)
+                print("✗ Should have failed for wrong dimensions")
+                return False
+            except ValueError:
+                print("✓ Correctly caught wrong dimensions")
+            
+            # Test all zero features
+            zero_features = np.zeros((3, 512), dtype=np.float32)
+            try:
+                self.validate_reid_features(zero_features, 3)
+                print("✗ Should have failed for zero features")
+                return False
+            except ValueError:
+                print("✓ Correctly caught zero features")
+                
+        except Exception as e:
+            print(f"✗ Error case validation failed: {e}")
+            return False
+        
+        print("\n✓ All self-tests passed!")
+        print("✓ Re-ID pipeline validation is working correctly")
+        return True
+    
+    def validate_pipeline_configuration(self):
+        """
+        Comprehensive validation of the entire pipeline configuration.
+        This should be called at the beginning of processing to catch issues early.
+        """
+        print("=== Pipeline Configuration Validation ===")
+        
+        # Validate Re-ID model configuration
+        if not hasattr(self, 'reid_pred_config') or not self.reid_pred_config:
+            raise RuntimeError("Re-ID predictor configuration not initialized")
+        
+        if not hasattr(self, 'reid_predictor') or not self.reid_predictor:
+            raise RuntimeError("Re-ID predictor not initialized")
+        
+        # Get expected input/output shapes from the Re-ID model
+        try:
+            input_names = self.reid_predictor.get_input_names()
+            output_names = self.reid_predictor.get_output_names()
+            
+            if not input_names or not output_names:
+                raise RuntimeError("Re-ID model input/output names not available")
+            
+            input_tensor = self.reid_predictor.get_input_handle(input_names[0])
+            output_tensor = self.reid_predictor.get_output_handle(output_names[0])
+            
+            # Store expected shapes for validation
+            self.expected_reid_input_shape = input_tensor.shape
+            self.expected_reid_output_shape = output_tensor.shape
+            
+            print(f"✓ Re-ID model input shape: {self.expected_reid_input_shape}")
+            print(f"✓ Re-ID model output shape: {self.expected_reid_output_shape}")
+            
+            # Validate that the Re-ID model expects the format we're providing
+            # Expected: (batch_size, channels, height, width) = (batch_size, 3, 192, 64)
+            if len(self.expected_reid_input_shape) == 4:
+                batch_size, channels, height, width = self.expected_reid_input_shape
+                if channels != 3:
+                    raise RuntimeError(f"Re-ID model expects {channels} channels, but we're providing 3")
+                if height != 192 or width != 64:
+                    raise RuntimeError(f"Re-ID model expects {height}x{width}, but we're providing 192x64")
+                print(f"✓ Re-ID model input format validation passed: (batch_size, {channels}, {height}, {width})")
+            else:
+                print(f"Warning: Re-ID model input shape is not 4D: {self.expected_reid_input_shape}")
+            
+        except Exception as e:
+            raise RuntimeError(f"Failed to get Re-ID model shapes: {e}")
+        
+        # Validate crop processing configuration
+        self.expected_crop_shape = (192, 64, 3)  # Height, Width, Channels
+        self.expected_crop_batch_shape = (None, 3, 192, 64)  # Batch, Channels, Height, Width
+        
+        print(f"✓ Expected individual crop shape: {self.expected_crop_shape}")
+        print(f"✓ Expected crop batch shape: {self.expected_crop_batch_shape}")
+        
+        # Validate normalization parameters
+        self.imagenet_mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        self.imagenet_std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        print(f"✓ ImageNet normalization: mean={self.imagenet_mean}, std={self.imagenet_std}")
+        
+        # Validate tracker configuration
+        if not hasattr(self, 'tracker') or not self.tracker:
+            raise RuntimeError("Tracker not initialized")
+        
+        print("✓ Tracker initialized successfully")
+        
+        # Run self-tests to validate the validation logic itself
+        print("\nRunning validation logic self-tests...")
+        if not self._run_self_tests():
+            raise RuntimeError("Re-ID pipeline self-tests failed. Validation logic may be broken.")
+        
+        print("✓ Pipeline configuration validation passed")
+        print("=" * 50)
+    
+    def validate_tensor_dimensions(self, tensor, name, expected_shape, expected_dtype=None):
+        """
+        Comprehensive tensor dimension validation.
+        
+        Args:
+            tensor: The tensor to validate
+            name: Name of the tensor for error messages
+            expected_shape: Expected shape (can be tuple or list of possible shapes)
+            expected_dtype: Expected data type (optional)
+            
+        Returns:
+            True if validation passes
+            
+        Raises:
+            ValueError: If validation fails
+        """
+        if tensor is None:
+            raise ValueError(f"{name} is None")
+        
+        # Convert expected_shape to list of tuples for easier comparison
+        if isinstance(expected_shape, tuple):
+            expected_shapes = [expected_shape]
+        elif isinstance(expected_shape, list):
+            expected_shapes = expected_shape
+        else:
+            raise ValueError(f"expected_shape must be tuple or list, got {type(expected_shape)}")
+        
+        actual_shape = tensor.shape
+        actual_dtype = tensor.dtype
+        
+        # Check shape
+        shape_matches = False
+        for exp_shape in expected_shapes:
+            if exp_shape is None or len(exp_shape) != len(actual_shape):
+                continue
+            
+            # Check each dimension, allowing None to match any value
+            dim_matches = True
+            for i, (exp_dim, act_dim) in enumerate(zip(exp_shape, actual_shape)):
+                if exp_dim is not None and exp_dim != act_dim:
+                    dim_matches = False
+                    break
+            
+            if dim_matches:
+                shape_matches = True
+                break
+        
+        if not shape_matches:
+            expected_str = " or ".join([str(s) for s in expected_shapes])
+            raise ValueError(f"{name} shape mismatch: expected {expected_str}, got {actual_shape}")
+        
+        # Check dtype if specified
+        if expected_dtype is not None and actual_dtype != expected_dtype:
+            raise ValueError(f"{name} dtype mismatch: expected {expected_dtype}, got {actual_dtype}")
+        
+        if self.debug_mode:
+            print(f"🔍 {name} validation details:")
+            print(f"   Shape: {actual_shape}")
+            print(f"   Dtype: {actual_dtype}")
+            print(f"   Min value: {np.min(tensor):.4f}")
+            print(f"   Max value: {np.max(tensor):.4f}")
+            print(f"   Mean value: {np.mean(tensor):.4f}")
+        else:
+            print(f"✓ {name} validation passed: shape={actual_shape}, dtype={actual_dtype}")
+        return True
+    
+    def validate_reid_features(self, features, num_crops):
+        """
+        Validate Re-ID feature extraction results to ensure the model is working correctly.
+        
+        Args:
+            features: Extracted Re-ID features
+            num_crops: Number of input crops
+            
+        Returns:
+            True if validation passes
+        """
+        print(f"=== Re-ID Feature Validation ===")
+        
+        if features is None:
+            raise ValueError("Re-ID features are None")
+        
+        print(f"Feature array shape: {features.shape}")
+        print(f"Expected features: {num_crops}")
+        
+        # Validate feature array shape
+        if len(features.shape) != 2:
+            raise ValueError(f"Expected 2D feature array, got shape {features.shape}")
+        
+        batch_size, feature_dim = features.shape
+        if batch_size != num_crops:
+            raise ValueError(f"Feature batch size mismatch: expected {num_crops}, got {batch_size}")
+        
+        # Validate feature dimension (should be reasonable for Re-ID)
+        if feature_dim < 64 or feature_dim > 2048:
+            print(f"Warning: Unusual feature dimension: {feature_dim}")
+            print(f"Typical Re-ID feature dimensions are between 64-2048")
+        
+        # Validate feature values
+        feature_min = np.min(features)
+        feature_max = np.max(features)
+        feature_mean = np.mean(features)
+        feature_std = np.std(features)
+        
+        print(f"Feature statistics:")
+        print(f"  Range: [{feature_min:.4f}, {feature_max:.4f}]")
+        print(f"  Mean: {feature_mean:.4f}")
+        print(f"  Std: {feature_std:.4f}")
+        
+        # Check for reasonable feature values
+        if np.isnan(features).any():
+            raise ValueError("Features contain NaN values")
+        
+        if np.isinf(features).any():
+            raise ValueError("Features contain infinite values")
+        
+        # Check if features are all zeros (indicates model failure)
+        if np.allclose(features, 0):
+            raise ValueError("All features are zero - this indicates Re-ID model failure")
+        
+        # Check if features are all identical (indicates model failure)
+        if np.allclose(features, features[0]):
+            raise ValueError("All features are identical - this indicates Re-ID model failure")
+        
+        # Validate feature norms (should be reasonable for L2 normalization)
+        feature_norms = np.linalg.norm(features, axis=1)
+        norm_mean = np.mean(feature_norms)
+        norm_std = np.std(feature_norms)
+        
+        print(f"Feature L2 norms: mean={norm_mean:.4f}, std={norm_std:.4f}")
+        
+        # Check if norms are reasonable (not too small or too large)
+        if norm_mean < 0.1:
+            print(f"Warning: Very small feature norms (mean={norm_mean:.4f})")
+        if norm_mean > 10.0:
+            print(f"Warning: Very large feature norms (mean={norm_mean:.4f})")
+        
+        print(f"✓ Re-ID feature validation passed")
+        print(f"✓ Features shape: {features.shape}")
+        print(f"✓ Feature dimension: {feature_dim}")
+        
+        return True
+    
+    def validate_reid_preprocessing(self, crops, expected_shape=(192, 64, 3)):
+        """
+        Comprehensive validation of Re-ID preprocessing to ensure crops are properly formatted
+        for the PaddleDetection DeepSORT Re-ID model.
+        
+        This function validates:
+        1. Correct dimensions and orientation
+        2. Proper color space (RGB)
+        3. Correct normalization (ImageNet mean/std)
+        4. Proper data type (float32)
+        5. Correct dimension ordering for Re-ID model
+        
+        Args:
+            crops: Input crops array
+            expected_shape: Expected shape for individual crops (height, width, channels)
+            
+        Returns:
+            Validated and properly formatted crops for Re-ID model
+        """
+        if crops is None or len(crops) == 0:
+            raise ValueError("No crops provided for Re-ID preprocessing validation")
+        
+        print(f"=== Re-ID Preprocessing Validation ===")
+        print(f"Input crops shape: {crops.shape}")
+        print(f"Expected individual crop shape: {expected_shape}")
+        
+        # Step 1: Handle dimension issues
+        if len(crops.shape) == 5:
+            # Shape: (num_crops, 1, height, width, channels) - remove extra batch dimension
+            print("Detected 5D input, removing extra batch dimension...")
+            crops = crops.squeeze(axis=1)
+            print(f"After squeeze: {crops.shape}")
+        elif len(crops.shape) == 4:
+            # Shape: (num_crops, height, width, channels) - this is correct
+            print("Detected 4D input, shape looks correct...")
+        else:
+            raise ValueError(f"Unexpected crops shape: {crops.shape}. Expected 4D or 5D array.")
+        
+        # Step 2: Validate individual crop dimensions
+        num_crops, height, width, channels = crops.shape
+        if (height, width, channels) != expected_shape:
+            raise ValueError(f"Individual crop shape mismatch: expected {expected_shape}, got ({height}, {width}, {channels})")
+        
+        # Step 3: Validate data type
+        if crops.dtype != np.float32:
+            print(f"Warning: Converting crops from {crops.dtype} to float32")
+            crops = crops.astype(np.float32)
+        
+        # Step 4: Validate normalization range
+        # Re-ID models expect normalized values, typically in range [-1, 1] or [0, 1]
+        # Check if crops are already normalized (should be in range roughly [-2, 2] for ImageNet normalization)
+        min_val = np.min(crops)
+        max_val = np.max(crops)
+        print(f"Crop value range: [{min_val:.3f}, {max_val:.3f}]")
+        
+        # Expected range for ImageNet normalization: roughly [-2, 2]
+        # (0 - mean) / std = (0 - [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225] ≈ [-2.1, 1.8]
+        if min_val < -3 or max_val > 3:
+            print(f"Warning: Crop values outside expected ImageNet normalization range [-3, 3]")
+            print(f"This may indicate incorrect preprocessing")
+        
+        # Step 5: Validate color space (should be RGB)
+        # Since we convert BGR to RGB in get_crops(), this should be correct
+        # But let's verify the color distribution looks reasonable
+        if channels == 3:
+            # Check if the color distribution looks reasonable for RGB
+            # In RGB, all channels should have similar ranges
+            r_mean = np.mean(crops[:, :, :, 0])
+            g_mean = np.mean(crops[:, :, :, 1])
+            b_mean = np.mean(crops[:, :, :, 2])
+            print(f"Channel means (R,G,B): ({r_mean:.3f}, {g_mean:.3f}, {b_mean:.3f})")
+            
+            # If one channel is significantly different, it might indicate BGR instead of RGB
+            channel_diff = max(abs(r_mean - g_mean), abs(r_mean - b_mean), abs(g_mean - b_mean))
+            if channel_diff > 0.5:
+                print(f"Warning: Large channel differences detected ({channel_diff:.3f})")
+                print(f"This might indicate incorrect color space conversion")
+        
+        # Step 6: Convert to Re-ID model format: (batch_size, channels, height, width)
+        # This is the standard format for most deep learning models including PaddleDetection
+        crops_reid_format = np.transpose(crops, (0, 3, 1, 2))
+        print(f"Converted to Re-ID format: {crops_reid_format.shape}")
+        
+        # Step 7: Final validation of Re-ID format
+        batch_size, channels, height, width = crops_reid_format.shape
+        if channels != 3 or height != 192 or width != 64:
+            raise ValueError(f"Re-ID format validation failed: expected (batch_size, 3, 192, 64), got {crops_reid_format.shape}")
+        
+        print(f"✓ Re-ID preprocessing validation passed")
+        print(f"✓ Final format: {crops_reid_format.shape} (batch_size, channels, height, width)")
+        print(f"✓ Data type: {crops_reid_format.dtype}")
+        print(f"✓ Value range: [{np.min(crops_reid_format):.3f}, {np.max(crops_reid_format):.3f}]")
+        
+        return crops_reid_format
+    
+    def validate_and_fix_crop_dimensions(self, crops, expected_shape=(192, 64, 3)):
+        """
+        Validate and fix crop dimensions for Re-ID processing.
+        
+        Args:
+            crops: Input crops array with potentially incorrect dimensions
+            expected_shape: Expected shape for individual crops (height, width, channels)
+            
+        Returns:
+            Fixed crops array with correct dimensions for Re-ID model
+        """
+        if crops is None or len(crops) == 0:
+            raise ValueError("No crops provided for validation")
+        
+        print(f"Validating crop dimensions...")
+        print(f"Input crops shape: {crops.shape}")
+        print(f"Expected individual crop shape: {expected_shape}")
+        
+        # Handle different input shapes
+        if len(crops.shape) == 5:
+            # Shape: (num_crops, 1, height, width, channels) - remove extra batch dimension
+            print("Detected 5D input, removing extra batch dimension...")
+            crops = crops.squeeze(axis=1)
+            print(f"After squeeze: {crops.shape}")
+        elif len(crops.shape) == 4:
+            # Shape: (num_crops, height, width, channels) - this is correct
+            print("Detected 4D input, shape looks correct...")
+        else:
+            raise ValueError(f"Unexpected crops shape: {crops.shape}. Expected 4D or 5D array.")
+        
+        # Validate individual crop dimensions
+        num_crops, height, width, channels = crops.shape
+        if (height, width, channels) != expected_shape:
+            raise ValueError(f"Individual crop shape mismatch: expected {expected_shape}, got ({height}, {width}, {channels})")
+        
+        # Convert to Re-ID model format: (batch_size, channels, height, width)
+        # This is the standard format for most deep learning models
+        crops_reid_format = np.transpose(crops, (0, 3, 1, 2))
+        print(f"Converted to Re-ID format: {crops_reid_format.shape}")
+        
+        return crops_reid_format
+    
     def get_crops(self, tlwhs, frame, w=64, h=192):
         """Extracts and resizes image crops from bounding boxes."""
         crops = []
@@ -196,7 +690,7 @@ OCSORTTracker:
             print("Warning: No bounding boxes provided for cropping")
             return np.array(crops, dtype=np.float32)
         
-        for tlwh in tlwhs:
+        for i, tlwh in enumerate(tlwhs):
             x, y, w_box, h_box = map(int, tlwh)
             
             # Ensure coordinates are within frame bounds
@@ -217,24 +711,49 @@ OCSORTTracker:
                     resized_crop = resized_crop.astype('float32') / 255.0
                     resized_crop = (resized_crop - mean) / std
                     
-                    # Add batch dimension
-                    resized_crop = np.expand_dims(resized_crop, axis=0)
+                    # STRICT VALIDATION: Check individual crop shape immediately
+                    if resized_crop.shape != expected_shape:
+                        raise ValueError(f"Crop {i} shape mismatch: expected {expected_shape}, got {resized_crop.shape}")
+                    
+                    # Don't add batch dimension here - we'll handle it later
                     crops.append(resized_crop)
                 else:
                     print(f"Warning: Empty crop for bbox {tlwh}")
-                    crops.append(np.zeros((1, h, w, 3), dtype='float32'))
+                    zero_crop = np.zeros((h, w, 3), dtype='float32')
+                    if zero_crop.shape != expected_shape:
+                        raise ValueError(f"Zero crop {i} shape mismatch: expected {expected_shape}, got {zero_crop.shape}")
+                    crops.append(zero_crop)
             else:
                 print(f"Warning: Invalid bbox dimensions {tlwh}")
-                crops.append(np.zeros((1, h, w, 3), dtype='float32'))
+                zero_crop = np.zeros((h, w, 3), dtype='float32')
+                if zero_crop.shape != expected_shape:
+                    raise ValueError(f"Zero crop {i} shape mismatch: expected {expected_shape}, got {zero_crop.shape}")
+                crops.append(zero_crop)
         
-        # Validate overall crop dimensions once
+        # Convert to numpy array without adding extra batch dimension
         crops_array = np.array(crops, dtype=np.float32)
-        expected_batch_shape = (len(crops), 1, h, w, 3)
+        expected_batch_shape = (len(crops), h, w, 3)
         
+        # STRICT VALIDATION: Check overall array shape
         if crops_array.shape != expected_batch_shape:
             raise ValueError(f"Crops array shape mismatch: expected {expected_batch_shape}, got {crops_array.shape}")
         
+        # STRICT VALIDATION: Check each individual crop shape again
+        for i, crop in enumerate(crops_array):
+            if crop.shape != expected_shape:
+                raise ValueError(f"Individual crop {i} in array shape mismatch: expected {expected_shape}, got {crop.shape}")
+        
         print(f"Crops validation passed: {len(crops)} crops with shape {crops_array.shape}")
+        
+        # FINAL VALIDATION: Ensure we're returning the correct format
+        # Each individual crop should be (192, 64, 3) and the array should be (num_crops, 192, 64, 3)
+        if len(crops_array.shape) != 4:
+            raise ValueError(f"Final crops array should be 4D, got {len(crops_array.shape)}D with shape {crops_array.shape}")
+        
+        if crops_array.shape[1:] != (h, w, 3):
+            raise ValueError(f"Final crops array individual crop shape should be ({h}, {w}, 3), got {crops_array.shape[1:]}")
+        
+        print(f"✓ Final validation: returning {crops_array.shape[0]} crops with individual shape {crops_array.shape[1:]}")
         return crops_array
     
     def encode_crop_to_base64(self, crop):
@@ -272,9 +791,9 @@ OCSORTTracker:
         if crops is None or len(crops) == 0:
             raise ValueError("No crops provided for Re-ID feature extraction")
         
-        # Expected shape for Re-ID model: (batch_size, 1, height, width, channels)
+        # Expected shape for Re-ID model: (batch_size, channels, height, width)
         # where height=192, width=64, channels=3
-        expected_shape = (192, 64, 3)  # Height, Width, Channels
+        expected_shape = (3, 192, 64)  # Channels, Height, Width
         
         try:
             # Get input/output handles
@@ -283,32 +802,20 @@ OCSORTTracker:
             input_tensor = self.reid_predictor.get_input_handle(input_names[0])
             output_tensor = self.reid_predictor.get_output_handle(output_names[0])
             
-            # Prepare input data using the Re-ID model's preprocessing configuration
-            if len(crops.shape) == 4:
-                input_data = crops
-            else:
-                input_data = np.expand_dims(crops, axis=0)
-            
-            # Ensure input data is float32 to prevent dtype mismatches with model weights
-            input_data = input_data.astype(np.float32)
-            
             # Validate input data shape for Re-ID model
-            if len(input_data.shape) != 4:
-                raise ValueError(f"Expected 4D input data, got shape {input_data.shape}")
+            if len(crops.shape) != 4:
+                raise ValueError(f"Expected 4D input data (batch_size, channels, height, width), got shape {crops.shape}")
             
             # Validate the spatial dimensions (batch_size, channels, height, width)
-            batch_size, channels, height, width = input_data.shape
-            if height != 192 or width != 64 or channels != 3:
-                raise ValueError(f"Expected input shape (batch_size, 3, 192, 64), got {input_data.shape}")
+            batch_size, channels, height, width = crops.shape
+            if channels != 3 or height != 192 or width != 64:
+                raise ValueError(f"Expected input shape (batch_size, 3, 192, 64), got {crops.shape}")
+            
+            # Ensure input data is float32 to prevent dtype mismatches with model weights
+            input_data = crops.astype(np.float32)
             
             # Debug: Log data type and shape before inference
             print(f"Re-ID input data shape: {input_data.shape}, dtype: {input_data.dtype}")
-            
-            # Apply preprocessing if configuration is available
-            if hasattr(self, 'reid_pred_config') and self.reid_pred_config:
-                # The crops should already be preprocessed according to the model's requirements
-                # (resized to 64x192, normalized, etc.) from the get_crops method
-                pass
             
             input_tensor.copy_from_cpu(input_data)
             self.reid_predictor.run()
@@ -327,6 +834,9 @@ OCSORTTracker:
         """
         print(f"=== Starting video processing ===")
         print(f"Video path: {video_path}")
+        
+        # Validate pipeline configuration first
+        self.validate_pipeline_configuration()
         
         # Validate video file exists
         if not os.path.exists(video_path):
@@ -379,33 +889,44 @@ OCSORTTracker:
         
         # Extract features from all crops
         print(f"Preparing crops for Re-ID feature extraction...")
-        all_crops = np.array([d['crop'] for d in all_detections if d['crop'] is not None])
+        
+        # Debug: Check individual crop shapes before creating array
+        crop_list = [d['crop'] for d in all_detections if d['crop'] is not None]
+        print(f"Number of crops to process: {len(crop_list)}")
+        
+        for i, crop in enumerate(crop_list[:3]):  # Check first 3 crops
+            print(f"Crop {i} shape: {crop.shape}, dtype: {crop.dtype}")
+        
+        all_crops = np.array(crop_list)
         print(f"Valid crops found: {len(all_crops)} out of {len(all_detections)} detections")
         
         if len(all_crops) == 0:
             raise RuntimeError("No valid image crops found for Re-ID feature extraction. Cannot proceed with clustering.")
         
-        # Validate crop dimensions before Re-ID processing
-        expected_crop_shape = (1, 192, 64, 3)  # (batch, height, width, channels)
-        if all_crops.shape[1:] != expected_crop_shape[1:]:
-            raise ValueError(f"Crop shape mismatch: expected {expected_crop_shape[1:]}, got {all_crops.shape[1:]}")
+        # STRICT VALIDATION: Check the raw crops array shape immediately
+        print(f"Raw all_crops shape: {all_crops.shape}")
+        expected_raw_shape = (len(all_crops), 192, 64, 3)  # (num_crops, height, width, channels)
         
-        print(f"Crop validation passed: {all_crops.shape}")
+        if all_crops.shape != expected_raw_shape:
+            raise ValueError(f"Raw crops array shape mismatch: expected {expected_raw_shape}, got {all_crops.shape}. This indicates crops were stored with wrong dimensions.")
         
-        print(f"Extracting Re-ID features from {len(all_crops)} crops...")
+        # STRICT VALIDATION: Check each individual crop shape
+        for i, crop in enumerate(all_crops):
+            expected_crop_shape = (192, 64, 3)
+            if crop.shape != expected_crop_shape:
+                raise ValueError(f"Individual crop {i} shape mismatch: expected {expected_crop_shape}, got {crop.shape}")
+        
+        print(f"✓ Raw crops validation passed: {all_crops.shape}")
+        
+        # Comprehensive Re-ID preprocessing validation
+        all_crops = self.validate_reid_preprocessing(all_crops, expected_shape=(192, 64, 3))
+        
+        print(f"Extracting Re-ID features from {all_crops.shape[0]} crops...")
         all_features = self.extract_reid_features(all_crops)
         print(f"Re-ID features extracted successfully: {all_features.shape}")
         
-        # Validate Re-ID feature dimensions
-        if len(all_features.shape) != 2:
-            raise ValueError(f"Expected 2D feature array, got shape {all_features.shape}")
-        
-        expected_features = len(all_crops)
-        actual_features = all_features.shape[0]
-        if actual_features != expected_features:
-            raise ValueError(f"Feature count mismatch: expected {expected_features}, got {actual_features}")
-        
-        print(f"Re-ID feature validation passed: {all_features.shape[0]} features with {all_features.shape[1]} dimensions")
+        # Comprehensive Re-ID feature validation
+        self.validate_reid_features(all_features, len(all_crops))
         
         # Add features back to detections
         crop_idx = 0
@@ -428,8 +949,12 @@ OCSORTTracker:
         print(f"Clustering complete: {unique_clusters} clusters, {noise_points} noise points")
         
         # Validate clustering results
-        if len(cluster_labels) != len(all_features):
-            raise ValueError(f"Cluster labels count mismatch: expected {len(all_features)}, got {len(cluster_labels)}")
+        self.validate_tensor_dimensions(
+            cluster_labels,
+            "cluster_labels",
+            expected_shape=(len(all_features),),
+            expected_dtype=np.int32
+        )
         
         print(f"Clustering validation passed: {len(cluster_labels)} labels assigned")
         
@@ -455,7 +980,8 @@ OCSORTTracker:
             "clustering_info": {
                 "total_detections": len(all_detections),
                 "unique_clusters": len(set(d['cluster_id'] for d in all_detections if d['cluster_id'] != -1))
-            }
+            },
+            "validation_summary": self.get_validation_summary() if self.debug_mode else None
         }
         
         # Group detections by cluster
@@ -581,6 +1107,14 @@ OCSORTTracker:
                     x1, y1, w, h = boxes_for_cls[j]
                     bbox = [x1, y1, x1 + w, y1 + h]
                     
+                    # Ensure individual crop has correct shape (192, 64, 3)
+                    individual_crop = crops[j] if j < len(crops) else None
+                    if individual_crop is not None:
+                        # Validate individual crop shape
+                        expected_crop_shape = (192, 64, 3)
+                        if individual_crop.shape != expected_crop_shape:
+                            raise ValueError(f"Individual crop {j} shape mismatch: expected {expected_crop_shape}, got {individual_crop.shape}")
+                    
                     all_detections.append({
                         "frame_id": frame_id,
                         "track_id": track_id,
@@ -588,7 +1122,7 @@ OCSORTTracker:
                         "bbox": bbox,
                         "bbox_tlwh": boxes_for_cls[j],
                         "score": float(scores_for_cls[j]),
-                        "crop": crops[j] if j < len(crops) else None
+                        "crop": individual_crop
                     })
         
         print(f"GPU processing complete. Total detections: {len(all_detections)}")
@@ -763,7 +1297,8 @@ OCSORTTracker:
 def predict(
     video_url: str = Input(description="URL to download video from (may have authentication issues)", default=None),
     video_file: str = Input(description="Path to local video file", default=None),
-    video: CogPath = Input(description="Uploaded video file (preferred method)", default=None)
+    video: CogPath = Input(description="Uploaded video file (preferred method)", default=None),
+    debug_mode: bool = Input(description="Enable debug mode for detailed validation output", default=True)
 ) -> Dict[str, Any]:
     """
     Main prediction function for Cog with two-step tracking: ByteTrack + Re-ID clustering
@@ -777,7 +1312,7 @@ def predict(
         Dictionary containing vending machine item tracking results with Re-ID clustering
     """
     try:
-        tracker = MultiObjectTracker()
+        tracker = MultiObjectTracker(debug_mode=debug_mode)
         
         if video:
             # Use uploaded video file (preferred method)
