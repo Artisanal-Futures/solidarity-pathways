@@ -55,7 +55,7 @@ class MultiObjectTracker:
             output_dir="/tmp/output",
             save_images=False,
             save_mot_txts=False,
-            reid_model_dir=self.reid_model_dir  # Add Re-ID model for feature extraction
+            reid_model_dir=None  # FIX: Pass None to prevent internal Re-ID loading bug
         )
         
         # Initialize Re-ID predictor separately for clustering
