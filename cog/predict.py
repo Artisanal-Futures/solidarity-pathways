@@ -74,6 +74,8 @@ class MultiObjectTracker:
             # Step 1: Load the model's configuration from its infer_cfg.yml file.
             # The PredictConfig class handles this automatically.
             self.reid_pred_config = PredictConfig(self.reid_model_dir)
+            if not hasattr(self.reid_pred_config, 'arch') or not self.reid_pred_config.arch:
+                raise RuntimeError(f"Invalid or missing architecture in Re-ID config at {self.reid_model_dir}/infer_cfg.yml. Re-ID is required for object clustering.")
 
             # Step 2: Initialize the predictor using the loaded configuration.
             self.reid_predictor, _ = load_predictor(
@@ -89,6 +91,7 @@ class MultiObjectTracker:
                 trt_calib_mode=False,
                 cpu_threads=1,
                 enable_mkldnn=False,
+                arch=self.reid_pred_config.arch
             )
             print(f"Re-ID predictor initialized successfully from {self.reid_model_dir}")
 
