@@ -278,12 +278,19 @@ OCSORTTracker:
         1. Single-pass ByteTrack to get detections and crops.
         2. Offline Re-ID clustering to get stable IDs.
         """
-        print(f"Processing video with single-pass workflow: {video_path}")
+        print(f"=== Starting video processing ===")
+        print(f"Video path: {video_path}")
         
+        # Validate video file exists
+        if not os.path.exists(video_path):
+            raise FileNotFoundError(f"Video file not found: {video_path}")
+        
+        print(f"Video file exists, opening with OpenCV...")
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise ValueError(f"Could not open video file: {video_path}")
         
+        print(f"Video opened successfully, reading properties...")
         fps = int(cap.get(cv2.CAP_PROP_FPS))
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -291,17 +298,22 @@ OCSORTTracker:
         
         print(f"Video properties: {width}x{height}, {fps} fps, {frame_count} frames")
         
+        # Release the capture since we'll use pre-loaded frames
+        cap.release()
+        print(f"Initial video capture released")
+        
         # --- Step 1: Parallel Frame Processing ---
-        print("Step 1: Processing frames in parallel...")
+        print("=== Step 1: Parallel Frame Processing ===")
         
         # Determine optimal number of workers
         num_workers = min(mp.cpu_count(), 8)  # Cap at 8 to avoid memory issues
-        print(f"Using {num_workers} parallel workers")
+        print(f"CPU cores available: {mp.cpu_count()}, using {num_workers} parallel workers")
         
         # Process frames in parallel
+        print(f"Starting frame processing with {num_workers} workers...")
         all_detections = self._process_frames_parallel(video_path, frame_count, num_workers)
         
-        print(f"Collected {len(all_detections)} detections across {frame_count} frames")
+        print(f"Frame processing complete: {len(all_detections)} detections across {frame_count} frames")
         
         if not all_detections:
             return {
@@ -316,14 +328,19 @@ OCSORTTracker:
             }
         
         # --- Step 2: Extract Re-ID Features and Cluster ---
-        print("Step 2: Extracting Re-ID features and clustering...")
+        print("=== Step 2: Re-ID Feature Extraction and Clustering ===")
         
         # Extract features from all crops
+        print(f"Preparing crops for Re-ID feature extraction...")
         all_crops = np.array([d['crop'] for d in all_detections if d['crop'] is not None])
+        print(f"Valid crops found: {len(all_crops)} out of {len(all_detections)} detections")
+        
         if len(all_crops) == 0:
             raise RuntimeError("No valid image crops found for Re-ID feature extraction. Cannot proceed with clustering.")
         
+        print(f"Extracting Re-ID features from {len(all_crops)} crops...")
         all_features = self.extract_reid_features(all_crops)
+        print(f"Re-ID features extracted successfully: {all_features.shape}")
         
         # Add features back to detections
         crop_idx = 0
@@ -333,11 +350,17 @@ OCSORTTracker:
                 crop_idx += 1
         
         # Normalize features for clustering
+        print(f"Normalizing features for clustering...")
         normalized_features = normalize(all_features, norm='l2')
         
         # Cluster using DBSCAN
+        print(f"Performing DBSCAN clustering with eps=0.4, min_samples=2...")
         clustering = DBSCAN(eps=0.4, min_samples=2, metric='cosine').fit(normalized_features)
         cluster_labels = clustering.labels_
+        
+        unique_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
+        noise_points = list(cluster_labels).count(-1)
+        print(f"Clustering complete: {unique_clusters} clusters, {noise_points} noise points")
         
         # Assign cluster labels back to detections
         crop_idx = 0
@@ -349,7 +372,7 @@ OCSORTTracker:
                 detection['cluster_id'] = -1  # Noise
         
         # --- Step 3: Build Final Results ---
-        print("Step 3: Building final results...")
+        print("=== Step 3: Building Final Results ===")
         
         results = {
             "total_frames": frame_count,
@@ -426,7 +449,12 @@ OCSORTTracker:
         results["total_objects"] = sum(results["objects_detected"].values())
         results["unique_classes"] = list(results["objects_detected"].keys())
         
+        print(f"=== Video Processing Complete ===")
         print(f"Final results: {results['total_objects']} unique objects across {len(results['unique_classes'])} classes")
+        print(f"Classes detected: {results['unique_classes']}")
+        print(f"Total frames processed: {results['total_frames']}")
+        print(f"Video resolution: {results['resolution']}")
+        print(f"Video FPS: {results['fps']}")
         
         return results
     
@@ -442,11 +470,8 @@ OCSORTTracker:
     
     def _process_frames_sequential_gpu(self, video_path: str, frame_count: int) -> List[Dict]:
         """Process frames sequentially on GPU with parallel CPU preprocessing"""
+        print(f"Starting GPU-optimized sequential processing for {frame_count} frames")
         all_detections = []
-        
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            return all_detections
         
         # Pre-load frames in parallel for CPU preprocessing
         print("Pre-loading frames in parallel for CPU preprocessing...")
@@ -495,7 +520,7 @@ OCSORTTracker:
                         "crop": crops[j] if j < len(crops) else None
                     })
         
-        cap.release()
+        print(f"GPU processing complete. Total detections: {len(all_detections)}")
         return all_detections
     
     def _preload_frames_parallel(self, video_path: str, frame_count: int) -> List[tuple]:
@@ -517,6 +542,7 @@ OCSORTTracker:
             frame_ranges.append((i, end_frame))
         
         print(f"Pre-loading {len(frame_ranges)} batches of ~{batch_size} frames each")
+        print(f"Using ThreadPoolExecutor with max_workers=4 for parallel pre-loading")
         
         # Pre-load frames in parallel (CPU-bound task)
         with ThreadPoolExecutor(max_workers=4) as executor:
@@ -549,6 +575,7 @@ OCSORTTracker:
         # Create a new video capture for this thread
         thread_cap = cv2.VideoCapture(video_path)
         if not thread_cap.isOpened():
+            print(f"Warning: Could not open video in thread for frames {start_frame}-{end_frame}")
             return []
             
         thread_cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
