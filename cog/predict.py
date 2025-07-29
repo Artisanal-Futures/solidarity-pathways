@@ -436,6 +436,9 @@ OCSORTTracker:
         if not cap.isOpened():
             return all_detections
         
+        # Store video path for parallel processing
+        cap._video_path = video_path
+        
         # Pre-load frames in parallel for CPU preprocessing
         print("Pre-loading frames in parallel for CPU preprocessing...")
         frame_batches = self._preload_frames_parallel(cap, frame_count)
@@ -488,6 +491,13 @@ OCSORTTracker:
     
     def _preload_frames_parallel(self, cap, frame_count: int) -> List[tuple]:
         """Pre-load frames in parallel for CPU preprocessing"""
+        # Get the video path from the capture object
+        video_path = getattr(cap, '_video_path', None)
+        if video_path is None:
+            # If we can't get the path, fall back to sequential processing
+            print("Warning: Cannot get video path for parallel pre-loading, using sequential processing")
+            return self._preload_frames_sequential(cap, frame_count)
+        
         # Determine optimal batch size for pre-loading
         batch_size = max(1, frame_count // 20)  # Create ~20 batches for pre-loading
         frame_batches = []
@@ -504,7 +514,7 @@ OCSORTTracker:
         with ThreadPoolExecutor(max_workers=4) as executor:
             # Submit pre-loading tasks
             future_to_range = {
-                executor.submit(self._preload_frame_batch, cap, start_frame, end_frame): (start_frame, end_frame)
+                executor.submit(self._preload_frame_batch, video_path, start_frame, end_frame): (start_frame, end_frame)
                 for start_frame, end_frame in frame_ranges
             }
             
@@ -524,12 +534,15 @@ OCSORTTracker:
         
         return frame_batches
     
-    def _preload_frame_batch(self, cap, start_frame: int, end_frame: int) -> List[tuple]:
+    def _preload_frame_batch(self, video_path: str, start_frame: int, end_frame: int) -> List[tuple]:
         """Pre-load a batch of frames with CPU preprocessing"""
         batch_frames = []
         
         # Create a new video capture for this thread
-        thread_cap = cv2.VideoCapture(cap.get(cv2.CAP_PROP_POS_FRAMES))
+        thread_cap = cv2.VideoCapture(video_path)
+        if not thread_cap.isOpened():
+            return []
+            
         thread_cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
         
         frame_id = start_frame
@@ -547,6 +560,31 @@ OCSORTTracker:
         
         thread_cap.release()
         return batch_frames
+    
+    def _preload_frames_sequential(self, cap, frame_count: int) -> List[tuple]:
+        """Fallback sequential frame pre-loading when parallel processing fails"""
+        frame_batches = []
+        
+        print("Using sequential frame pre-loading...")
+        
+        # Process frames sequentially
+        frame_id = 0
+        while frame_id < frame_count:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            frame_id += 1
+            
+            # Pre-process frame on CPU (convert to RGB)
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            frame_batches.append((frame_id, frame, frame_rgb))
+            
+            if frame_id % 50 == 0:
+                print(f"Sequential pre-loading: {frame_id}/{frame_count} frames")
+        
+        return frame_batches
     
     def get_class_name(self, class_id: int) -> str:
         """Map class ID to class name - focused on vending machine contents"""
