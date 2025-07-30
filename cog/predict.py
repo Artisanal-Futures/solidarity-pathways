@@ -184,6 +184,40 @@ OCSORTTracker:
         
         return thumbnail_b64
     
+    def _safe_get_tensor_shape(self, tensor, name="tensor"):
+        """
+        Safely extract shape from PaddlePaddle inference tensor.
+        
+        Args:
+            tensor: PaddlePaddle inference tensor
+            name: Name for error messages
+            
+        Returns:
+            List of shape dimensions
+        """
+        try:
+            # Try to get shape as a method call
+            if hasattr(tensor, 'shape') and callable(tensor.shape):
+                shape = tensor.shape()
+            elif hasattr(tensor, 'shape'):
+                shape = tensor.shape
+            else:
+                raise ValueError(f"Cannot get shape from {name}")
+            
+            # Convert to list if it's not already
+            if hasattr(shape, 'tolist'):
+                shape_list = shape.tolist()
+            elif hasattr(shape, '__iter__'):
+                shape_list = list(shape)
+            else:
+                shape_list = [shape]
+            
+            return shape_list
+            
+        except Exception as e:
+            print(f"Warning: Could not extract shape from {name}: {e}")
+            return None
+    
     def get_validation_summary(self):
         """
         Get a comprehensive summary of the validation status and pipeline configuration.
@@ -200,10 +234,15 @@ OCSORTTracker:
         try:
             if hasattr(self, 'reid_predictor') and self.reid_predictor:
                 summary["validation_checks"]["reid_model"] = "✓ Initialized"
-                if hasattr(self, 'expected_reid_input_shape'):
+                if hasattr(self, 'expected_reid_input_shape') and self.expected_reid_input_shape:
                     summary["model_configuration"]["reid_input_shape"] = str(self.expected_reid_input_shape)
-                if hasattr(self, 'expected_reid_output_shape'):
+                else:
+                    summary["model_configuration"]["reid_input_shape"] = "Not available"
+                        
+                if hasattr(self, 'expected_reid_output_shape') and self.expected_reid_output_shape:
                     summary["model_configuration"]["reid_output_shape"] = str(self.expected_reid_output_shape)
+                else:
+                    summary["model_configuration"]["reid_output_shape"] = "Not available"
             else:
                 summary["validation_checks"]["reid_model"] = "✗ Not initialized"
         except Exception as e:
@@ -345,16 +384,23 @@ OCSORTTracker:
             input_tensor = self.reid_predictor.get_input_handle(input_names[0])
             output_tensor = self.reid_predictor.get_output_handle(output_names[0])
             
-            # Store expected shapes for validation
-            self.expected_reid_input_shape = input_tensor.shape
-            self.expected_reid_output_shape = output_tensor.shape
+            # Store expected shapes for validation using safe extraction
+            self.expected_reid_input_shape = self._safe_get_tensor_shape(input_tensor, "input_tensor")
+            self.expected_reid_output_shape = self._safe_get_tensor_shape(output_tensor, "output_tensor")
             
-            print(f"✓ Re-ID model input shape: {self.expected_reid_input_shape}")
-            print(f"✓ Re-ID model output shape: {self.expected_reid_output_shape}")
+            if self.expected_reid_input_shape:
+                print(f"✓ Re-ID model input shape: {self.expected_reid_input_shape}")
+            else:
+                print("⚠ Warning: Could not extract Re-ID model input shape")
+                
+            if self.expected_reid_output_shape:
+                print(f"✓ Re-ID model output shape: {self.expected_reid_output_shape}")
+            else:
+                print("⚠ Warning: Could not extract Re-ID model output shape")
             
             # Validate that the Re-ID model expects the format we're providing
             # Expected: (batch_size, channels, height, width) = (batch_size, 3, 192, 64)
-            if len(self.expected_reid_input_shape) == 4:
+            if self.expected_reid_input_shape and len(self.expected_reid_input_shape) == 4:
                 batch_size, channels, height, width = self.expected_reid_input_shape
                 if channels != 3:
                     raise RuntimeError(f"Re-ID model expects {channels} channels, but we're providing 3")
@@ -362,7 +408,8 @@ OCSORTTracker:
                     raise RuntimeError(f"Re-ID model expects {height}x{width}, but we're providing 192x64")
                 print(f"✓ Re-ID model input format validation passed: (batch_size, {channels}, {height}, {width})")
             else:
-                print(f"Warning: Re-ID model input shape is not 4D: {self.expected_reid_input_shape}")
+                print(f"Warning: Re-ID model input shape validation skipped - shape: {self.expected_reid_input_shape}")
+                print(f"This is normal if the model uses dynamic shapes")
             
         except Exception as e:
             raise RuntimeError(f"Failed to get Re-ID model shapes: {e}")
