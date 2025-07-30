@@ -524,6 +524,8 @@ OCSORTTracker:
         
         print(f"Feature array shape: {features.shape}")
         print(f"Expected features: {num_crops}")
+        if self.debug_mode:
+            print(f"🔍 Features dtype: {features.dtype}")
         
         # Validate feature array shape
         if len(features.shape) != 2:
@@ -789,8 +791,8 @@ OCSORTTracker:
         for i, crop in enumerate(crops_array):
             if crop.shape != expected_shape:
                 raise ValueError(f"Individual crop {i} in array shape mismatch: expected {expected_shape}, got {crop.shape}")
-        
-        print(f"Crops validation passed: {len(crops)} crops with shape {crops_array.shape}")
+        # compare first element shape to expected shape; incorrect to do shape of array
+        print(f"Crops validation passed: {len(crops)} crops with shape {crops_array[0].shape}")
         
         # FINAL VALIDATION: Ensure we're returning the correct format
         # Each individual crop should be (192, 64, 3) and the array should be (num_crops, 192, 64, 3)
@@ -867,6 +869,14 @@ OCSORTTracker:
             input_tensor.copy_from_cpu(input_data)
             self.reid_predictor.run()
             features = output_tensor.copy_to_cpu()
+            
+            # Ensure features are float32
+            if features.dtype != np.float32:
+                print(f"Warning: Converting features from {features.dtype} to float32")
+                features = features.astype(np.float32)
+            
+            if self.debug_mode:
+                print(f"🔍 Re-ID features dtype: {features.dtype}")
             
             return features
             
@@ -985,17 +995,28 @@ OCSORTTracker:
         # Normalize features for clustering
         print(f"Normalizing features for clustering...")
         normalized_features = normalize(all_features, norm='l2')
+        if self.debug_mode:
+            print(f"🔍 Normalized features dtype: {normalized_features.dtype}")
         
         # Cluster using DBSCAN
         print(f"Performing DBSCAN clustering with eps=0.4, min_samples=2...")
         clustering = DBSCAN(eps=0.4, min_samples=2, metric='cosine').fit(normalized_features)
         cluster_labels = clustering.labels_
         
+        # Convert cluster labels to int32 to match validation expectations
+        if self.debug_mode:
+            print(f"🔍 Original cluster labels dtype: {cluster_labels.dtype}")
+        cluster_labels = cluster_labels.astype(np.int32)
+        if self.debug_mode:
+            print(f"🔍 Converted cluster labels dtype: {cluster_labels.dtype}")
+        
         unique_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
         noise_points = list(cluster_labels).count(-1)
         print(f"Clustering complete: {unique_clusters} clusters, {noise_points} noise points")
         
         # Validate clustering results
+        if self.debug_mode:
+            print(f"🔍 Validating cluster labels: shape={cluster_labels.shape}, dtype={cluster_labels.dtype}")
         self.validate_tensor_dimensions(
             cluster_labels,
             "cluster_labels",
