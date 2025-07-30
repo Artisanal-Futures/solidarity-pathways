@@ -912,6 +912,12 @@ OCSORTTracker:
         
         print(f"Video properties: {width}x{height}, {fps} fps, {frame_count} frames")
         
+        # Debug mode: Limit to first 5 seconds for faster testing
+        if self.debug_mode:
+            debug_frames = min(frame_count, fps * 5)  # 5 seconds worth of frames
+            print(f"🔍 Debug mode: Limiting processing to first {debug_frames} frames (5 seconds)")
+            frame_count = debug_frames
+        
         # Release the capture since we'll use pre-loaded frames
         cap.release()
         print(f"Initial video capture released")
@@ -1049,7 +1055,12 @@ OCSORTTracker:
                 "total_detections": len(all_detections),
                 "unique_clusters": len(set(d['cluster_id'] for d in all_detections if d['cluster_id'] != -1))
             },
-            "validation_summary": self.get_validation_summary() if self.debug_mode else None
+            "validation_summary": self.get_validation_summary() if self.debug_mode else None,
+            "debug_info": {
+                "debug_mode": self.debug_mode,
+                "frames_processed": frame_count,
+                "processing_time_limited": self.debug_mode
+            } if self.debug_mode else None
         }
         
         # Group detections by cluster
@@ -1115,6 +1126,8 @@ OCSORTTracker:
         results["unique_classes"] = list(results["objects_detected"].keys())
         
         print(f"=== Video Processing Complete ===")
+        if self.debug_mode:
+            print(f"🔍 Debug mode: Processed {results['total_frames']} frames (limited to 5 seconds)")
         print(f"Final results: {results['total_objects']} unique objects across {len(results['unique_classes'])} classes")
         print(f"Classes detected: {results['unique_classes']}")
         print(f"Total frames processed: {results['total_frames']}")
