@@ -53,6 +53,11 @@ class Predictor(BasePredictor):
         self,
         video: CogPath = Input(description="Input video file for object tracking"),
         debug: bool = Input(description="If true, processes only the first 4 seconds of the video for faster testing", default=False),
+        # Detection parameters
+        conf: float = Input(description="Confidence threshold for object detection (0.0-1.0)", default=0.3),
+        iou: float = Input(description="IoU threshold for non-maximum suppression (0.0-1.0)", default=0.3),
+        max_det: int = Input(description="Maximum number of detections per frame", default=25),# wouldn't see more than 25 obejcts in a frame
+        # Tracking parameters
         track_buffer: int = Input(description="Number of frames to keep tracks alive (higher = more tolerance for occlusion)", default=300),
         track_high_thresh: float = Input(description="Threshold for first association during tracking (0.0-1.0)", default=0.3),
         track_low_thresh: float = Input(description="Threshold for second association during tracking (0.0-1.0)", default=0.1),
@@ -129,9 +134,9 @@ class Predictor(BasePredictor):
                 frame, 
                 persist=True, 
                 tracker=tracker_config_path,
-                conf=0.3,                           # Lower confidence for glass reflections
-                iou=0.3,                            # Lower IoU for better matching
-                max_det=50,                         # Allow more detections per frame
+                conf=conf,                          # User-defined confidence threshold
+                iou=iou,                            # User-defined IoU threshold
+                max_det=max_det,                    # User-defined max detections
                 verbose=True
             )
 
@@ -166,7 +171,8 @@ class Predictor(BasePredictor):
         cv2.destroyAllWindows()
 
         # Save representative images and prepare response
-        saved_images = []
+        # Following ControlNet pattern for Replicate image handling
+        object_images_output = []
         for track_id in sorted(unique_track_ids):
             if track_id in object_images:
                 # Save image to temporary file
@@ -176,13 +182,23 @@ class Predictor(BasePredictor):
                 temp_dir = tempfile.mkdtemp()
                 image_path = os.path.join(temp_dir, f"object_{track_id}.jpg")
                 cv2.imwrite(image_path, object_images[track_id])
-                saved_images.append(image_path)
+                object_images_output.append(image_path)
 
-        # Return results as dictionary
-        return {
-            "total_objects": len(unique_track_ids),
-            "object_images": saved_images,
-            "track_ids": sorted(list(unique_track_ids))
-        }
+        # Return results following ControlNet pattern
+        # Return the first image as main output, and include all data in the response
+        if object_images_output:
+            return object_images_output[0], {
+                "total_objects": len(unique_track_ids),
+                "all_object_images": object_images_output,
+                "track_ids": sorted(list(unique_track_ids)),
+                "summary": f"Detected {len(unique_track_ids)} unique objects in the video"
+            }
+        else:
+            return None, {
+                "total_objects": len(unique_track_ids),
+                "all_object_images": [],
+                "track_ids": sorted(list(unique_track_ids)),
+                "summary": f"Detected {len(unique_track_ids)} unique objects in the video"
+            }
 
 # The predict function is now handled by Cog's BasePredictor classgit

@@ -49,8 +49,3 @@ build:
 # Define the prediction interface.
 # This tells Cog which file and class to run for predictions.
 predict: "predict.py:Predictor"
-
-# Define the output that the `predict` function will return.
-output:
-  type: dict
-  description: "Dictionary containing total object count, object images, and track IDs."
