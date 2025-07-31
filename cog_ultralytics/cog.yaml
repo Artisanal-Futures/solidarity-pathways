@@ -38,7 +38,7 @@ build:
   # This ensures the model is available before the container starts
   run:
     - mkdir -p /root/.cache/ultralytics
-    - wget -O /root/.cache/ultralytics/yolo11n.pt https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.pt
+    - wget -O /root/.cache/ultralytics/yolo11x.pt https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11x.pt
 
 # Define the prediction interface.
 # This tells Cog which file and class to run for predictions.

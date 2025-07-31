@@ -14,7 +14,8 @@ class Predictor(BasePredictor):
     def setup(self) -> None:
         """Load the model into memory to make running multiple predictions efficient"""
         # Load the model from the specific path where it was downloaded during build
-        model_path = "/root/.cache/ultralytics/yolo11n.pt"
+        # Using YOLO11x - the largest and most accurate model available
+        model_path = "/root/.cache/ultralytics/yolo11x.pt"
         self.model = YOLO(model_path)
 
     def predict(
