@@ -36,6 +36,9 @@ build:
     
     # Required for ByteTrack tracker (Linear Assignment Problem solver)
     - "lapx>=0.5.2"
+    
+    # Required for custom tracker configuration
+    - "pyyaml>=6.0"
 
   # Pre-build step to download the YOLO model during image build
   # This ensures the model is available before the container starts

@@ -17,6 +17,40 @@ class Predictor(BasePredictor):
         # Using YOLO11x - the largest and most accurate model available
         model_path = "/root/.cache/ultralytics/yolo11x.pt"
         self.model = YOLO(model_path)
+        
+        # Create custom tracker config for vending machine carousel tracking
+        self._create_tracker_config()
+    
+    def _create_tracker_config(self):
+        """Create a custom tracker configuration optimized for vending machine carousel tracking"""
+        import yaml
+        import os
+        
+        # Custom tracker config for long-term tracking with carousel rotation
+        # Based on standard BoTSORT configuration with optimizations for vending machine carousel
+        tracker_config = {
+            'tracker_type': 'botsort',
+            'track_high_thresh': 0.3,      # Lower threshold for glass occlusion
+            'track_low_thresh': 0.1,       # Very low threshold for weak detections
+            'new_track_thresh': 0.3,       # Threshold for new track creation
+            'track_buffer': 300,           # Keep tracks alive for 300 frames (10 seconds at 30fps)
+            'match_thresh': 0.7,           # Lower matching threshold for better association
+            'fuse_score': True,            # Fuse confidence scores with IoU distances
+            'gmc_method': 'sparseOptFlow', # Global motion compensation for camera movement
+            'with_reid': True,             # Enable Re-Identification for long-term tracking
+            'proximity_thresh': 0.5,       # Minimum IoU for ReID matching
+            'appearance_thresh': 0.25      # Minimum appearance similarity for ReID
+        }
+        
+        # Save custom tracker config
+        config_path = "/tmp/custom_botsort.yaml"
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        
+        with open(config_path, 'w') as f:
+            yaml.dump(tracker_config, f)
+        
+        self.custom_tracker_config = config_path
+        print(f"Created custom tracker config for vending machine carousel tracking: {config_path}")
 
     def predict(
         self,
@@ -70,23 +104,15 @@ class Predictor(BasePredictor):
                 print("DEBUG MODE: Reached 4-second limit. Stopping video processing.")
                 break
 
-            # Run YOLO tracking on the frame with advanced parameters for carousel tracking
-            # Using ReID (Re-Identification) for better long-term tracking across carousel rotation
+            # Run YOLO tracking on the frame with custom tracker config for carousel tracking
+            # Using custom BoTSORT config with ReID for long-term tracking across carousel rotation
             results = self.model.track(
                 frame, 
                 persist=True, 
-                tracker="botsort.yaml",             # Use BoTSORT which supports ReID better than ByteTrack
+                tracker="/tmp/custom_botsort.yaml",  # Use custom tracker config file path
                 conf=0.3,                           # Lower confidence for glass reflections
                 iou=0.3,                            # Lower IoU for better matching
                 max_det=50,                         # Allow more detections per frame
-                with_reid=True,                     # Enable Re-Identification for long-term tracking
-                track_buffer=300,                   # Keep tracks alive for 300 frames (10 seconds at 30fps) - handles 8s carousel rotation
-                track_high_thresh=0.3,              # Lower threshold for glass occlusion
-                track_low_thresh=0.1,               # Very low threshold for weak detections
-                new_track_thresh=0.3,               # Threshold for new track creation
-                match_thresh=0.7,                   # Lower matching threshold for better association
-                proximity_thresh=0.5,               # Minimum IoU for ReID matching
-                appearance_thresh=0.25,             # Minimum appearance similarity for ReID
                 verbose=True
             )
 
