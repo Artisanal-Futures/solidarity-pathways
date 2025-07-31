@@ -75,12 +75,19 @@ class Predictor(BasePredictor):
             results = self.model.track(
                 frame, 
                 persist=True, 
-                tracker="bytetrack.yaml",           # Use ByteTrack with ReID
+                tracker="botsort.yaml",             # Use BoTSORT which supports ReID better than ByteTrack
                 conf=0.3,                           # Lower confidence for glass reflections
                 iou=0.3,                            # Lower IoU for better matching
                 max_det=50,                         # Allow more detections per frame
-                reid=True,                          # Enable Re-Identification for long-term tracking
-                verbose=False
+                with_reid=True,                     # Enable Re-Identification for long-term tracking
+                track_buffer=300,                   # Keep tracks alive for 300 frames (10 seconds at 30fps) - handles 8s carousel rotation
+                track_high_thresh=0.3,              # Lower threshold for glass occlusion
+                track_low_thresh=0.1,               # Very low threshold for weak detections
+                new_track_thresh=0.3,               # Threshold for new track creation
+                match_thresh=0.7,                   # Lower matching threshold for better association
+                proximity_thresh=0.5,               # Minimum IoU for ReID matching
+                appearance_thresh=0.25,             # Minimum appearance similarity for ReID
+                verbose=True
             )
 
             # Check if any objects were tracked in the current frame [[1131, 2342]]
