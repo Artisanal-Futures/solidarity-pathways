@@ -1,0 +1,45 @@
+
+# cog.yaml
+# Configuration for a Cog model that uses Ultralytics YOLO to count unique objects in a video.
+
+build:
+  # Instruct Cog to use a GPU-enabled environment.
+  # The Ultralytics library and PyTorch will leverage the GPU for faster inference [[1342]].
+  gpu: true
+
+  # Specify the Python version. Version 3.10 is mentioned in the documentation [[1457]].
+  python_version: "3.10"
+
+  # Install system-level packages required by the Python libraries.
+  # libgl1 is a common dependency for OpenCV.
+  system_packages:
+    - "libgl1-mesa-glx"
+    - "ffmpeg"
+    - "wget"
+
+  # Install the required Python packages with specific versions found in the document.
+  python_packages:
+    # PyTorch is a core dependency for Ultralytics.
+    # The document indicates a torch version compatible with CUDA [[1457]].
+    - "torch==2.2.1"
+    
+    # The main library for YOLO object detection and tracking.
+    # Updated to latest 8.3.0 release for better compatibility.
+    - "ultralytics==8.3.0"
+    
+    # Required for video processing (reading frames).
+    # Version 4.11.0.86 is specified in the documentation [[1482]].
+    - "opencv-python==4.11.0.86"
+    
+    # Pin NumPy to version 1.x to avoid compatibility issues with PyTorch
+    - "numpy<2.0"
+
+  # Pre-build step to download the YOLO model during image build
+  # This ensures the model is available before the container starts
+  run:
+    - mkdir -p /root/.cache/ultralytics
+    - wget -O /root/.cache/ultralytics/yolo11n.pt https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.pt
+
+# Define the prediction interface.
+# This tells Cog which file and class to run for predictions.
+predict: "predict.py:Predictor"
