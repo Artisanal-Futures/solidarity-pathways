@@ -130,13 +130,14 @@ class Predictor(BasePredictor):
                 break
 
             # Run YOLO tracking on the frame with custom tracker config
+            # Convert parameters to correct types to avoid type validation errors
             results = self.model.track(
                 frame, 
                 persist=True, 
                 tracker=tracker_config_path,
-                conf=conf,                          # User-defined confidence threshold
-                iou=iou,                            # User-defined IoU threshold
-                max_det=max_det,                    # User-defined max detections
+                conf=float(conf),                   # Convert to regular float
+                iou=float(iou),                     # Convert to regular float
+                max_det=int(max_det),               # Convert to regular int
                 verbose=True
             )
 
