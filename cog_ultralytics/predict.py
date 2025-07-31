@@ -21,7 +21,7 @@ class Predictor(BasePredictor):
     def predict(
         self,
         video: CogPath = Input(description="Input video file for object tracking"),
-        debug: bool = Input(description="If true, processes only the first 4 seconds of the video for faster testing", default=True)
+        debug: bool = Input(description="If true, processes only the first 4 seconds of the video for faster testing", default=False)
     ) -> int:
         """
         Performs object tracking on a video to count the total number of unique objects detected.
@@ -70,10 +70,18 @@ class Predictor(BasePredictor):
                 print("DEBUG MODE: Reached 4-second limit. Stopping video processing.")
                 break
 
-            # Run YOLO tracking on the frame.
-            # 'persist=True' maintains tracks between frames [[1130, 2341]].
-            # 'tracker="bytetrack.yaml"' specifies the tracking algorithm [[1127, 2339]].
-            results = self.model.track(frame, persist=True, tracker="bytetrack.yaml", verbose=False)
+            # Run YOLO tracking on the frame with advanced parameters for carousel tracking
+            # Using ReID (Re-Identification) for better long-term tracking across carousel rotation
+            results = self.model.track(
+                frame, 
+                persist=True, 
+                tracker="bytetrack.yaml",           # Use ByteTrack with ReID
+                conf=0.3,                           # Lower confidence for glass reflections
+                iou=0.3,                            # Lower IoU for better matching
+                max_det=50,                         # Allow more detections per frame
+                reid=True,                          # Enable Re-Identification for long-term tracking
+                verbose=False
+            )
 
             # Check if any objects were tracked in the current frame [[1131, 2342]]
             if results[0].boxes.id is not None:
@@ -98,4 +106,4 @@ class Predictor(BasePredictor):
         
         return total_unique_objects
 
-# The predict function is now handled by Cog's BasePredictor class
+# The predict function is now handled by Cog's BasePredictor classgit

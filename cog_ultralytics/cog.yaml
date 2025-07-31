@@ -33,6 +33,9 @@ build:
     
     # Pin NumPy to version 1.x to avoid compatibility issues with PyTorch
     - "numpy<2.0"
+    
+    # Required for ByteTrack tracker (Linear Assignment Problem solver)
+    - "lapx>=0.5.2"
 
   # Pre-build step to download the YOLO model during image build
   # This ensures the model is available before the container starts
