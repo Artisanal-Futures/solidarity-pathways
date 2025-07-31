@@ -56,7 +56,7 @@ class Predictor(BasePredictor):
         # Detection parameters
         conf: float = Input(description="Confidence threshold for object detection (0.0-1.0)", default=0.3),
         iou: float = Input(description="IoU threshold for non-maximum suppression (0.0-1.0)", default=0.3),
-        max_det: int = Input(description="Maximum number of detections per frame", default=25),# wouldn't see more than 25 obejcts in a frame
+        max_det: int = Input(description="Maximum number of detections per frame", default=50),# Allow more detections for better candidate selection
         # Tracking parameters
         track_buffer: int = Input(description="Number of frames to keep tracks alive (higher = more tolerance for occlusion)", default=300),
         track_high_thresh: float = Input(description="Threshold for first association during tracking (0.0-1.0)", default=0.3),
@@ -91,21 +91,34 @@ class Predictor(BasePredictor):
             match_thresh, appearance_thresh, proximity_thresh, gmc_method
         )
         
-        # Get the video file path from the uploaded file
-        video_path = str(video)
+        # Debug: Print parameter values at the start
+        print(f"DEBUG: Input parameters - conf: {conf} (type: {type(conf)}), iou: {iou} (type: {type(iou)}), max_det: {max_det} (type: {type(max_det)})")
         
+        print("DEBUG: Stage 1 - Getting video file path")
+        # Get the video file path from the uploaded file
+        # CogPath objects have a .path attribute that gives us the actual file path
+        video_path = video.path if hasattr(video, 'path') else str(video)
+        print(f"DEBUG: Video path type: {type(video)}, Video path value: {video_path}")
+        
+        print("DEBUG: Stage 2 - Checking if video file exists")
         # Ensure the video file exists
         video_file = Path(video_path)
+        print(f"DEBUG: Video file path: {video_file}, exists: {video_file.is_file()}")
         if not video_file.is_file():
             raise FileNotFoundError(f"Error: Video file not found at {video_path}")
 
+        print("DEBUG: Stage 3 - Opening video file with OpenCV")
+        print(f"DEBUG: Attempting to open video at: {video_path}")
         # Open the video file using OpenCV
         cap = cv2.VideoCapture(video_path)
+        print(f"DEBUG: VideoCapture opened: {cap.isOpened()}")
         if not cap.isOpened():
             raise IOError(f"Error: Could not open video file {video_path}")
 
+        print("DEBUG: Stage 4 - Getting video properties")
         # Get video properties, specifically frames per second (FPS)
         fps = cap.get(cv2.CAP_PROP_FPS)
+        print(f"DEBUG: Video FPS: {fps}")
         
         # Set to store unique track IDs and their best representative images
         unique_track_ids: Set[int] = set()
@@ -118,6 +131,7 @@ class Predictor(BasePredictor):
             max_frames = int(4 * fps)
             print(f"DEBUG MODE: Processing only the first 4 seconds (~{max_frames} frames).")
 
+        print("DEBUG: Stage 5 - Starting video frame processing loop")
         # Loop through the video frames
         while cap.isOpened():
             success, frame = cap.read()
@@ -130,22 +144,48 @@ class Predictor(BasePredictor):
                 break
 
             # Run YOLO tracking on the frame with custom tracker config
-            # Convert parameters to correct types to avoid type validation errors
-            results = self.model.track(
-                frame, 
-                persist=True, 
-                tracker=tracker_config_path,
-                conf=float(conf),                   # Convert to regular float
-                iou=float(iou),                     # Convert to regular float
-                max_det=int(max_det),               # Convert to regular int
-                verbose=True
-            )
+            # Handle parameter types carefully to avoid precision loss
+            if frame_count == 1:
+                print("DEBUG: Stage 6 - Processing first frame with YOLO tracking")
+            
+            track_kwargs = {
+                'persist': True,
+                'tracker': tracker_config_path,
+                'verbose': False
+            }
+            
+            # Only add parameters if they're not None and handle types carefully
+            if frame_count % 30 == 0:  # Debug every 30 frames
+                print(f"DEBUG: Before assignment - conf: {conf}, iou: {iou}, max_det: {max_det}")
+            
+            if conf is not None:
+                track_kwargs['conf'] = float(conf) if hasattr(conf, 'dtype') else conf
+            if iou is not None:
+                track_kwargs['iou'] = float(iou) if hasattr(iou, 'dtype') else iou
+            if max_det is not None:
+                track_kwargs['max_det'] = int(max_det) if hasattr(max_det, 'dtype') else max_det
+            
+            # Debug: Print what we're actually passing to track
+            if frame_count % 30 == 0:  # Log every 30 frames
+                print(f"DEBUG: After assignment - conf: {track_kwargs.get('conf')}, iou: {track_kwargs.get('iou')}, max_det: {track_kwargs.get('max_det')}")
+                print(f"DEBUG: Original conf value: {conf}")
+                print(f"DEBUG: Local conf variable still: {conf}")
+            
+            if frame_count == 1:
+                print("DEBUG: Stage 7 - Calling YOLO model.track()")
+            
+            results = self.model.track(frame, **track_kwargs)
 
             # Check if any objects were tracked in the current frame
             if results[0].boxes.id is not None:
                 track_ids = results[0].boxes.id.int().cpu().tolist()
                 boxes = results[0].boxes.xyxy.cpu().numpy()
                 confidences = results[0].boxes.conf.cpu().numpy()
+                
+                # Debug logging
+                if frame_count % 30 == 0:  # Log every 30 frames
+                    print(f"Frame {frame_count}: Detected {len(track_ids)} objects with IDs: {track_ids}")
+                    print(f"Confidences: {confidences}")
                 
                 # Add the new track IDs to the set of unique IDs
                 unique_track_ids.update(track_ids)
@@ -154,10 +194,10 @@ class Predictor(BasePredictor):
                 for i, track_id in enumerate(track_ids):
                     if i < len(boxes) and i < len(confidences):
                         box = boxes[i]
-                        conf = confidences[i]
+                        detection_conf = confidences[i]  # Renamed to avoid variable conflict
                         
                         # Keep the image with highest confidence for each track
-                        if track_id not in object_confidences or conf > object_confidences[track_id]:
+                        if track_id not in object_confidences or detection_conf > object_confidences[track_id]:
                             # Extract object region from frame
                             x1, y1, x2, y2 = map(int, box)
                             x1, y1, x2, y2 = max(0, x1), max(0, y1), min(frame.shape[1], x2), min(frame.shape[0], y2)
@@ -165,35 +205,66 @@ class Predictor(BasePredictor):
                             if x2 > x1 and y2 > y1:  # Valid bounding box
                                 object_region = frame[y1:y2, x1:x2]
                                 object_images[track_id] = object_region
-                                object_confidences[track_id] = conf
+                                object_confidences[track_id] = detection_conf
 
         # Release the video capture object
         cap.release()
         cv2.destroyAllWindows()
+
+        print("DEBUG: Stage 8 - Video processing complete, preparing results")
+        # Debug summary
+        print(f"\n=== TRACKING SUMMARY ===")
+        print(f"Total frames processed: {frame_count}")
+        print(f"Unique track IDs found: {sorted(list(unique_track_ids))}")
+        print(f"Total unique objects: {len(unique_track_ids)}")
+        print(f"Objects with images: {len(object_images)}")
+        print(f"Tracker config used: {tracker_config_path}")
+        print(f"Detection params - conf: {conf}, iou: {iou}, max_det: {max_det}")
+        print("=======================\n")
 
         # Save representative images and prepare response
         # Following ControlNet pattern for Replicate image handling
         object_images_output = []
         for track_id in sorted(unique_track_ids):
             if track_id in object_images:
-                # Save image to temporary file
+                # Save image to temporary file with proper path handling
                 import tempfile
                 import os
                 
-                temp_dir = tempfile.mkdtemp()
-                image_path = os.path.join(temp_dir, f"object_{track_id}.jpg")
-                cv2.imwrite(image_path, object_images[track_id])
-                object_images_output.append(image_path)
+                # Create a unique temporary file
+                temp_fd, temp_path = tempfile.mkstemp(suffix='.jpg', prefix=f'object_{track_id}_')
+                os.close(temp_fd)  # Close the file descriptor
+                
+                # Save the image
+                cv2.imwrite(temp_path, object_images[track_id])
+                
+                # Create a path object that Replicate can handle
+                try:
+                    path_obj = CogPath(temp_path)
+                    object_images_output.append(path_obj)
+                except Exception as e:
+                    print(f"Warning: Could not create Path object for object {track_id}: {e}")
+                    # Fallback: just include the path
+                    object_images_output.append(temp_path)
 
         # Return results following ControlNet pattern
         # Return the first image as main output, and include all data in the response
         if object_images_output:
-            return object_images_output[0], {
-                "total_objects": len(unique_track_ids),
-                "all_object_images": object_images_output,
-                "track_ids": sorted(list(unique_track_ids)),
-                "summary": f"Detected {len(unique_track_ids)} unique objects in the video"
-            }
+            try:
+                return object_images_output[0], {
+                    "total_objects": len(unique_track_ids),
+                    "all_object_images": object_images_output,
+                    "track_ids": sorted(list(unique_track_ids)),
+                    "summary": f"Detected {len(unique_track_ids)} unique objects in the video"
+                }
+            except Exception as e:
+                print(f"Warning: Error returning first image, returning None: {e}")
+                return None, {
+                    "total_objects": len(unique_track_ids),
+                    "all_object_images": object_images_output,
+                    "track_ids": sorted(list(unique_track_ids)),
+                    "summary": f"Detected {len(unique_track_ids)} unique objects in the video"
+                }
         else:
             return None, {
                 "total_objects": len(unique_track_ids),
