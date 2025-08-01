@@ -1,8 +1,9 @@
-///app/api/vending-machine/route.ts
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+//app/api/vending-machine/route.ts
 import { NextResponse } from "next/server";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
-import{ type VendingMachine } from "~/types/vendingMachine";
+import { type VendingMachine } from "~/types/vendingMachine";
 import { vendingMachineSchema } from "~/lib/validators/vending-machine";
 import { type Prisma } from "@prisma/client";
 
@@ -33,13 +34,14 @@ function toVendingMachine(machine: {
     },
     address: machine.address,
     inventory,
-    createdAt: machine.createdAt,
-    updatedAt: machine.updatedAt
+   
+    createdAt: machine.createdAt.toISOString(),
+    updatedAt: machine.updatedAt.toISOString()
   };
 }
 
 export async function GET(): Promise<
-  NextResponse<{ 
+  NextResponse<{
     data?: VendingMachine[];
     error?: string;
   }>
@@ -53,7 +55,6 @@ export async function GET(): Promise<
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const machines = await db.vendingMachine.findMany({
       orderBy: { createdAt: "desc" },
       select: {
@@ -68,12 +69,11 @@ export async function GET(): Promise<
       }
     });
 
-    return NextResponse.json({ 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      data: machines.map(toVendingMachine) 
+    return NextResponse.json({
+      data: machines.map(toVendingMachine)
     });
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
+    console.error('GET vending machines error:', error);
     return NextResponse.json(
       { error: "Failed to fetch machines" },
       { status: 500 }
@@ -96,12 +96,10 @@ export async function POST(request: Request): Promise<
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const body = await request.json();
     console.log("Received body:", body);
     const { coordinates, ...validatedData } = vendingMachineSchema.parse(body);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const newMachine = await db.vendingMachine.create({
       data: {
         ...validatedData,
@@ -121,12 +119,11 @@ export async function POST(request: Request): Promise<
     });
 
     return NextResponse.json(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       { data: toVendingMachine(newMachine) },
       { status: 201 }
     );
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
+    console.error('POST vending machine error:', error);
     return NextResponse.json(
       { error: "Invalid machine data" },
       { status: 400 }

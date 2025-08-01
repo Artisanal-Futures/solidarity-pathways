@@ -1,10 +1,16 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-  provider        = "prisma-client-js"
-    previewFeatures = ["prismaSchemaFolder"]
+  provider = "prisma-client-js"
 }
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+}
+import "./agent.prisma"
+import "./forum.prisma"
+import "./message.prisma"
+import "./pathways.prisma"
+import "./product.prisma"
+import "./upcycle.prisma"
 
 enum Role {
   USER
@@ -14,15 +20,7 @@ enum Role {
   GUEST
 }
 
-datasource db {
-  provider     = "postgresql"
-  // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
-  // Further reading:
-  // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
-  // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
-  url          = env("DATABASE_URL")
 
-}
 
 model Example {
   id        String   @id @default(cuid())
@@ -169,8 +167,17 @@ model VendingMachine {
   longitude         Float
   address           String?
   inventory         Json      @default("{}")
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  levels    Json     @default("[]")
+  metadata  Json?    @default("{}")
+  machineType     String?  @default("standard")
+  status          String   @default("active")
+  installationDate DateTime?
+  lastMaintenance  DateTime?
+  totalLevels      Int      @default(0)
+  totalCompartments Int     @default(0)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@index([latitude, longitude])
+  @@map("vending_machines")
 }

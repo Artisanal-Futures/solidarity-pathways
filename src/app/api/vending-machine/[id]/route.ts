@@ -1,11 +1,11 @@
-///app/api/vending-machine/[id]/route.ts
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+// 修复后的 app/api/vending-machine/[id]/route.ts
 import { NextResponse } from "next/server";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
-import{ type VendingMachine } from "~/types/vendingMachine";
+import { type VendingMachine } from "~/types/vendingMachine";
 import { vendingMachineUpdateSchema } from "~/lib/validators/vending-machine";
 import { type Prisma } from "@prisma/client";
-
 
 // Type-safe conversion utility
 function toVendingMachine(machine: {
@@ -34,8 +34,9 @@ function toVendingMachine(machine: {
     },
     address: machine.address,
     inventory,
-    createdAt: machine.createdAt,
-    updatedAt: machine.updatedAt
+    // 修复：将 Date 转换为 string (ISO format)
+    createdAt: machine.createdAt.toISOString(),
+    updatedAt: machine.updatedAt.toISOString()
   };
 }
 
@@ -52,7 +53,6 @@ export async function GET(
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const machine = await db.vendingMachine.findUnique({
       where: { id: params.id },
       select: {
@@ -75,11 +75,10 @@ export async function GET(
     }
 
     return NextResponse.json({ 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       data: toVendingMachine(machine) 
     });
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
+    console.error('GET vending machine error:', error);
     return NextResponse.json(
       { error: "Failed to fetch machine" },
       { status: 500 }
@@ -100,7 +99,6 @@ export async function PATCH(
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const body = await request.json();
     const validatedData = vendingMachineUpdateSchema.parse(body);
 
@@ -117,10 +115,8 @@ export async function PATCH(
       })
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const updatedMachine = await db.vendingMachine.update({
       where: { id: params.id },
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       data: updateData,
       select: {
         id: true,
@@ -135,7 +131,6 @@ export async function PATCH(
     });
 
     return NextResponse.json({ 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       data: toVendingMachine(updatedMachine) 
     });
   } catch (error) {
@@ -160,7 +155,6 @@ export async function DELETE(
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await db.vendingMachine.delete({
       where: { id: params.id }
     });
